@@ -1,0 +1,21 @@
+{
+  "name": "motamayez-activation-server",
+  "version": "1.0.0",
+  "description": "Activation server for Motamayez app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "express-session": "^1.19.0",
+    "mongoose": "^7.8.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

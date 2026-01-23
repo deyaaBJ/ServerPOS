@@ -1,0 +1,12 @@
+{
+  "ABC-123": {
+    "used": true,
+    "deviceId": "DEVICE-001",
+    "activatedAt": "2026-01-21T19:29:48.809Z"
+  },
+  "dddd123": {
+    "used": false,
+    "deviceId": null,
+    "activatedAt": null
+  }
+}

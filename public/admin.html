@@ -1,0 +1,1430 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لوحة تحكم أدمن المتميز</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+        color: #333;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+        color: white;
+        padding: 30px;
+        text-align: center;
+        position: relative;
+      }
+
+      .header h1 {
+        font-size: 32px;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .header p {
+        opacity: 0.9;
+        font-size: 16px;
+      }
+
+      .header-badge {
+        position: absolute;
+        top: 20px;
+        left: 30px;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .content {
+        padding: 40px;
+      }
+
+      /* Login Box */
+      #loginBox {
+        max-width: 500px;
+        margin: 100px auto;
+        animation: slideUp 0.6s ease;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .form-group {
+        margin-bottom: 25px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 10px;
+        font-weight: 600;
+        color: #444;
+        font-size: 15px;
+      }
+
+      .form-control {
+        width: 100%;
+        padding: 15px 20px;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        font-size: 16px;
+        transition: all 0.3s;
+        background: #f8f9fa;
+      }
+
+      .form-control:focus {
+        border-color: #6a11cb;
+        outline: none;
+        background: white;
+        box-shadow: 0 0 0 4px rgba(106, 17, 203, 0.1);
+      }
+
+      .btn {
+        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+        color: white;
+        border: none;
+        padding: 16px 30px;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-width: 120px;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(106, 17, 203, 0.3);
+      }
+
+      .btn:active {
+        transform: translateY(0);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+        box-shadow: none !important;
+      }
+
+      .btn-danger {
+        background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+      }
+
+      .btn-success {
+        background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%);
+      }
+
+      .btn-warning {
+        background: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%);
+      }
+
+      /* Dashboard */
+      #dashboard {
+        display: none;
+        animation: fadeIn 0.6s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 40px;
+        flex-wrap: wrap;
+        gap: 20px;
+      }
+
+      .dashboard-header h2 {
+        font-size: 28px;
+        color: #2c3e50;
+      }
+
+      .dashboard-header p {
+        color: #7f8c8d;
+        margin-top: 5px;
+      }
+
+      .header-actions {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 25px;
+        margin-bottom: 40px;
+      }
+
+      .stat-card {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid #eef2f7;
+        transition:
+          transform 0.3s,
+          box-shadow 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+      }
+
+      .stat-card:nth-child(2)::before {
+        background: linear-gradient(90deg, #00b09b 0%, #96c93d 100%);
+      }
+
+      .stat-card:nth-child(3)::before {
+        background: linear-gradient(90deg, #ff416c 0%, #ff4b2b 100%);
+      }
+
+      .stat-card:nth-child(4)::before {
+        background: linear-gradient(90deg, #ff7e5f 0%, #feb47b 100%);
+      }
+
+      .stat-icon {
+        font-size: 40px;
+        margin-bottom: 15px;
+        opacity: 0.8;
+      }
+
+      .stat-card h3 {
+        font-size: 36px;
+        color: #2c3e50;
+        margin-bottom: 5px;
+        font-weight: 700;
+      }
+
+      .stat-card p {
+        color: #7f8c8d;
+        font-size: 15px;
+      }
+
+      /* Add Code Form */
+      .add-code-form {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 30px;
+        margin-bottom: 40px;
+        border: 2px dashed #dee2e6;
+      }
+
+      .add-code-form h3 {
+        color: #2c3e50;
+        margin-bottom: 20px;
+        font-size: 22px;
+      }
+
+      .form-row {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+      }
+
+      .form-row .form-control {
+        flex: 1;
+        min-width: 250px;
+      }
+
+      /* Table */
+      .table-container {
+        background: white;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        margin-top: 20px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1000px;
+      }
+
+      thead {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      }
+
+      th {
+        padding: 18px 20px;
+        text-align: right;
+        font-weight: 600;
+        color: #495057;
+        border-bottom: 2px solid #dee2e6;
+        font-size: 15px;
+        white-space: nowrap;
+      }
+
+      td {
+        padding: 16px 20px;
+        border-bottom: 1px solid #eef2f7;
+        color: #495057;
+        transition: background 0.2s;
+      }
+
+      tr:hover td {
+        background: #f8f9fa;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      .badge {
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        display: inline-block;
+      }
+
+      .badge-success {
+        background: #d4edda;
+        color: #155724;
+      }
+
+      .badge-danger {
+        background: #f8d7da;
+        color: #721c24;
+      }
+
+      .badge-warning {
+        background: #fff3cd;
+        color: #856404;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 10px;
+      }
+
+      .action-btn {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .action-btn:hover {
+        transform: translateY(-1px);
+      }
+
+      .delete-btn {
+        background: #ff6b6b;
+        color: white;
+      }
+
+      .delete-btn:hover {
+        background: #ff5252;
+      }
+
+      .details-btn {
+        background: #4dabf7;
+        color: white;
+      }
+
+      .details-btn:hover {
+        background: #339af0;
+      }
+
+      /* Alerts */
+      .alert {
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        display: none;
+        animation: slideIn 0.3s ease;
+        border: 1px solid transparent;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateX(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
+
+      .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border-color: #c3e6cb;
+      }
+
+      .alert-danger {
+        background: #f8d7da;
+        color: #721c24;
+        border-color: #f5c6cb;
+      }
+
+      .alert-warning {
+        background: #fff3cd;
+        color: #856404;
+        border-color: #ffeaa7;
+      }
+
+      .alert-info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border-color: #bee5eb;
+      }
+
+      /* Loading */
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+        font-size: 16px;
+      }
+
+      .loading::after {
+        content: "";
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border: 3px solid #e0e0e0;
+        border-top-color: #6a11cb;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 15px;
+        vertical-align: middle;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Modal */
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.3s ease;
+      }
+
+      .modal-content {
+        background: white;
+        border-radius: 20px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        animation: modalSlideUp 0.4s ease;
+      }
+
+      @keyframes modalSlideUp {
+        from {
+          opacity: 0;
+          transform: translateY(50px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .modal-header {
+        padding: 25px 30px;
+        border-bottom: 1px solid #eef2f7;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .modal-header h3 {
+        color: #2c3e50;
+        font-size: 22px;
+        margin: 0;
+      }
+
+      .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #7f8c8d;
+        padding: 5px;
+        line-height: 1;
+      }
+
+      .modal-close:hover {
+        color: #2c3e50;
+      }
+
+      .modal-body {
+        padding: 30px;
+      }
+
+      .modal-footer {
+        padding: 20px 30px;
+        border-top: 1px solid #eef2f7;
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+      }
+
+      /* Empty State */
+      .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #7f8c8d;
+      }
+
+      .empty-state-icon {
+        font-size: 60px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+      }
+
+      .empty-state h3 {
+        font-size: 22px;
+        margin-bottom: 10px;
+        color: #495057;
+      }
+
+      /* Responsive */
+      @media (max-width: 1200px) {
+        .content {
+          padding: 30px;
+        }
+
+        .header h1 {
+          font-size: 28px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 15px;
+        }
+
+        .header {
+          padding: 25px 20px;
+        }
+
+        .header h1 {
+          font-size: 24px;
+        }
+
+        .header-badge {
+          position: relative;
+          top: 0;
+          left: 0;
+          margin-bottom: 15px;
+          justify-content: center;
+        }
+
+        .content {
+          padding: 25px 20px;
+        }
+
+        .dashboard-header {
+          flex-direction: column;
+          text-align: center;
+          margin-bottom: 30px;
+        }
+
+        .header-actions {
+          justify-content: center;
+        }
+
+        .stats-grid {
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 20px;
+        }
+
+        .add-code-form {
+          padding: 25px 20px;
+        }
+
+        .form-row {
+          flex-direction: column;
+        }
+
+        .form-row .form-control {
+          min-width: auto;
+        }
+
+        .table-container {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+          min-width: 700px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .header h1 {
+          font-size: 22px;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .stat-card {
+          padding: 20px;
+        }
+
+        .btn {
+          padding: 14px 20px;
+          font-size: 15px;
+        }
+
+        .header-actions {
+          flex-direction: column;
+          width: 100%;
+        }
+
+        .header-actions .btn {
+          width: 100%;
+        }
+      }
+
+      /* Status indicators */
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .status-dot.active {
+        background: #00b09b;
+        box-shadow: 0 0 0 3px rgba(0, 176, 155, 0.2);
+      }
+
+      .status-dot.inactive {
+        background: #ff6b6b;
+        box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2);
+      }
+
+      /* Date formatting - English format */
+      .date-text {
+        font-family: "Courier New", monospace;
+        background: #f8f9fa;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        color: #495057;
+      }
+
+      /* Tooltip */
+      .tooltip {
+        position: relative;
+        display: inline-block;
+      }
+
+      .tooltip .tooltip-text {
+        visibility: hidden;
+        background: #333;
+        color: white;
+        text-align: center;
+        padding: 8px 12px;
+        border-radius: 6px;
+        position: absolute;
+        z-index: 100;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 13px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* Animation for new rows */
+      @keyframes highlightRow {
+        0% {
+          background: rgba(106, 17, 203, 0.1);
+        }
+        100% {
+          background: transparent;
+        }
+      }
+
+      .highlight {
+        animation: highlightRow 2s ease;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- 🔐 Login Box -->
+      <div id="loginBox" class="card">
+        <div class="header">
+          <div class="header-badge">
+            <span>🔒 نظام آمن</span>
+          </div>
+          <h1>👑 لوحة تحكم أدمن المتميز</h1>
+          <p>إدارة أكواد تفعيل برنامج المتميز</p>
+        </div>
+        <div class="content">
+          <div id="loginAlert" class="alert" style="display: none"></div>
+          <div class="form-group">
+            <label for="adminKey">🔑 كلمة سر الأدمن</label>
+            <input
+              type="password"
+              id="adminKey"
+              class="form-control"
+              placeholder="أدخل كلمة السر"
+              autocomplete="off"
+            />
+          </div>
+          <button onclick="login()" class="btn" style="width: 100%">
+            <span>🚀 تسجيل الدخول</span>
+          </button>
+          <div
+            style="
+              text-align: center;
+              margin-top: 20px;
+              color: #7f8c8d;
+              font-size: 14px;
+            "
+          ></div>
+        </div>
+      </div>
+
+      <!-- 📊 Dashboard -->
+      <div id="dashboard" class="card">
+        <div class="header">
+          <div class="header-badge">
+            <span id="dbStatus" class="status-indicator">
+              <span class="status-dot active"></span>
+              <span>MongoDB متصل</span>
+            </span>
+          </div>
+          <h1>📋 إدارة أكواد التفعيل</h1>
+          <p id="headerStats">جاري تحميل الإحصائيات...</p>
+        </div>
+        <div class="content">
+          <div id="alert" class="alert" style="display: none"></div>
+
+          <div class="dashboard-header">
+            <div>
+              <h2>مرحباً بك، الأدمن</h2>
+              <p>إدارة أكواد تفعيل برنامج المتميز</p>
+            </div>
+            <div class="header-actions">
+              <button onclick="loadCodes()" class="btn">
+                <span>🔄 تحديث</span>
+              </button>
+              <button
+                onclick="showChangePasswordModal()"
+                class="btn btn-warning"
+              >
+                <span>🔐 تغيير كلمة السر</span>
+              </button>
+              <button onclick="logout()" class="btn btn-danger">
+                <span>🚪 تسجيل الخروج</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">📊</div>
+              <h3 id="totalCount">0</h3>
+              <p>إجمالي الأكواد</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">✅</div>
+              <h3 id="usedCount">0</h3>
+              <p>الأكواد المفعلة</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">🆓</div>
+              <h3 id="availableCount">0</h3>
+              <p>الأكواد المتاحة</p>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon">📱</div>
+              <h3 id="devicesCount">0</h3>
+              <p>الأجهزة المفعلة</p>
+            </div>
+          </div>
+
+          <div class="add-code-form">
+            <h3>➕ إضافة كود جديد</h3>
+            <div class="form-row">
+              <input
+                type="text"
+                id="newCode"
+                class="form-control"
+                placeholder="أدخل كود التفعيل الجديد (مثال: MOTAMAYEZ-2024-001)"
+                maxlength="50"
+              />
+              <button onclick="addCode()" class="btn btn-success">
+                <span>✅ إضافة الكود</span>
+              </button>
+            </div>
+            <div style="margin-top: 15px; font-size: 14px; color: #7f8c8d">
+              💡 سيتم تحويل الكود تلقائياً إلى أحرف كبيرة (UPPERCASE)
+            </div>
+          </div>
+
+          <h3 style="margin-bottom: 15px; color: #2c3e50">📋 قائمة الأكواد</h3>
+          <div id="loading" class="loading">جاري تحميل الأكواد...</div>
+          <div class="table-container">
+            <table id="codesTable">
+              <thead>
+                <tr>
+                  <th>الكود</th>
+                  <th>الحالة</th>
+                  <th>رقم الجهاز</th>
+                  <th>تاريخ التفعيل</th>
+                  <th>تاريخ الإنشاء</th>
+                  <th>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- سيتم ملؤها بالجافاسكربت -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🔐 Modal لتغيير كلمة السر -->
+    <div id="changePasswordModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🔐 تغيير كلمة السر</h3>
+          <button class="modal-close" onclick="hideChangePasswordModal()">
+            ×
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="passwordAlert" class="alert" style="display: none"></div>
+          <div class="form-group">
+            <label for="currentPassword">كلمة السر الحالية</label>
+            <input
+              type="password"
+              id="currentPassword"
+              class="form-control"
+              placeholder="أدخل كلمة السر الحالية"
+            />
+          </div>
+          <div class="form-group">
+            <label for="newPassword">كلمة السر الجديدة</label>
+            <input
+              type="password"
+              id="newPassword"
+              class="form-control"
+              placeholder="أدخل كلمة السر الجديدة (6 أحرف على الأقل)"
+            />
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">تأكيد كلمة السر الجديدة</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              class="form-control"
+              placeholder="أعد إدخال كلمة السر الجديدة"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="hideChangePasswordModal()">إلغاء</button>
+          <button class="btn btn-success" onclick="changePassword()">
+            💾 حفظ التغييرات
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // عناصر DOM
+      const loginBox = document.getElementById("loginBox");
+      const dashboard = document.getElementById("dashboard");
+      const adminKeyInput = document.getElementById("adminKey");
+      const loginAlert = document.getElementById("loginAlert");
+      const alertBox = document.getElementById("alert");
+      const codesTable = document.querySelector("#codesTable tbody");
+      const loading = document.getElementById("loading");
+      const newCodeInput = document.getElementById("newCode");
+      const dbStatus = document.getElementById("dbStatus");
+      const headerStats = document.getElementById("headerStats");
+
+      // عناصر الإحصائيات
+      const totalCount = document.getElementById("totalCount");
+      const usedCount = document.getElementById("usedCount");
+      const availableCount = document.getElementById("availableCount");
+      const devicesCount = document.getElementById("devicesCount");
+
+      // Modal لتغيير كلمة السر
+      const changePasswordModal = document.getElementById(
+        "changePasswordModal",
+      );
+      const passwordAlert = document.getElementById("passwordAlert");
+
+      // 🔐 تسجيل الدخول
+      async function login() {
+        const key = adminKeyInput.value.trim();
+
+        if (!key) {
+          showAlert(loginAlert, "الرجاء إدخال كلمة السر", "danger");
+          adminKeyInput.focus();
+          return;
+        }
+
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "<span>⏳ جاري التحقق...</span>";
+        btn.disabled = true;
+
+        try {
+          const response = await fetch("/admin/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            loginBox.style.display = "none";
+            dashboard.style.display = "block";
+            showAlert(alertBox, "✅ تم تسجيل الدخول بنجاح", "success", 3000);
+            loadCodes();
+            loadStats();
+          } else {
+            showAlert(loginAlert, "❌ كلمة السر خاطئة", "danger");
+            adminKeyInput.value = "";
+            adminKeyInput.focus();
+          }
+        } catch (error) {
+          console.error("Login error:", error);
+          showAlert(loginAlert, "❌ خطأ في الاتصال بالسيرفر", "danger");
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+
+      // 🚪 تسجيل الخروج
+      function logout() {
+        if (confirm("هل تريد تسجيل الخروج؟")) {
+          loginBox.style.display = "block";
+          dashboard.style.display = "none";
+          adminKeyInput.value = "";
+          showAlert(loginAlert, "تم تسجيل الخروج بنجاح", "success");
+        }
+      }
+
+      // 📋 تحميل الأكواد
+      async function loadCodes() {
+        loading.style.display = "block";
+        codesTable.innerHTML = "";
+
+        try {
+          const response = await fetch("/admin/codes");
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+          const codes = await response.json();
+
+          // تحديث الإحصائيات
+          updateStats(codes);
+
+          // عرض الأكواد
+          if (!Array.isArray(codes) || codes.length === 0) {
+            codesTable.innerHTML = `
+              <tr>
+                <td colspan="6" style="text-align: center; padding: 50px; color: #7f8c8d;">
+                  <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <h3>لا توجد أكواد بعد</h3>
+                    <p>ابدأ بإضافة أول كود تفعيل</p>
+                  </div>
+                </td>
+              </tr>
+            `;
+            loading.style.display = "none";
+            return;
+          }
+
+          codes.forEach((code) => {
+            const row = document.createElement("tr");
+
+            // تظليل الصفوف الجديدة (تم إنشاؤها في آخر 5 دقائق)
+            const createdAt = new Date(code.createdAt);
+            const now = new Date();
+            const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+            if (createdAt > fiveMinutesAgo) {
+              row.classList.add("highlight");
+            }
+
+            const statusBadge = code.used
+              ? `<span class="badge badge-danger">🔒 مفعل</span>`
+              : `<span class="badge badge-success">✅ متاح</span>`;
+
+            // التاريخ باللغة الإنجليزية (الميلادي)
+            const formatDateEnglish = (date) => {
+              if (!date) return "-";
+              const d = new Date(date);
+              // تنسيق: YYYY-MM-DD HH:MM
+              const year = d.getFullYear();
+              const month = String(d.getMonth() + 1).padStart(2, "0");
+              const day = String(d.getDate()).padStart(2, "0");
+              const hours = String(d.getHours()).padStart(2, "0");
+              const minutes = String(d.getMinutes()).padStart(2, "0");
+              return `${year}-${month}-${day} ${hours}:${minutes}`;
+            };
+
+            const activatedDate = code.activatedAt
+              ? `<span class="date-text">${formatDateEnglish(code.activatedAt)}</span>`
+              : '<span style="color: #999;">-</span>';
+
+            const createdDate = `<span class="date-text">${formatDateEnglish(code.createdAt)}</span>`;
+
+            row.innerHTML = `
+              <td><strong style="font-family: monospace; font-size: 15px;">${code.code}</strong></td>
+              <td>${statusBadge}</td>
+              <td>${code.deviceId ? `<code style="background: #f8f9fa; padding: 4px 8px; border-radius: 4px; font-size: 13px;">${code.deviceId}</code>` : '<span style="color: #999;">-</span>'}</td>
+              <td>${activatedDate}</td>
+              <td>${createdDate}</td>
+              <td>
+                <div class="action-buttons">
+                  ${
+                    !code.used
+                      ? `
+                    <button onclick="deleteCode('${code.code}')" class="action-btn delete-btn" title="حذف الكود">
+                      🗑️ حذف
+                    </button>
+                  `
+                      : ""
+                  }
+                  <button onclick="showCodeDetails('${code.code}')" class="action-btn details-btn" title="عرض التفاصيل">
+                    🔍 تفاصيل
+                  </button>
+                </div>
+              </td>
+            `;
+
+            codesTable.appendChild(row);
+          });
+
+          loading.style.display = "none";
+        } catch (error) {
+          console.error("Load codes error:", error);
+          showAlert(
+            alertBox,
+            "❌ خطأ في تحميل الأكواد: " + error.message,
+            "danger",
+          );
+          loading.style.display = "none";
+
+          // عرض حالة فارغة مع زر إعادة المحاولة
+          codesTable.innerHTML = `
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 50px; color: #7f8c8d;">
+                <div class="empty-state">
+                  <div class="empty-state-icon">⚠️</div>
+                  <h3>حدث خطأ في التحميل</h3>
+                  <p>${error.message}</p>
+                  <button onclick="loadCodes()" class="btn" style="margin-top: 20px;">
+                    🔄 إعادة المحاولة
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }
+      }
+
+      // ➕ إضافة كود جديد
+      async function addCode() {
+        const code = newCodeInput.value.trim();
+
+        if (!code) {
+          showAlert(alertBox, "الرجاء إدخال كود التفعيل", "danger");
+          newCodeInput.focus();
+          return;
+        }
+
+        if (code.length < 3) {
+          showAlert(alertBox, "الكود يجب أن يكون 3 أحرف على الأقل", "danger");
+          newCodeInput.focus();
+          return;
+        }
+
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "<span>⏳ جاري الإضافة...</span>";
+        btn.disabled = true;
+
+        try {
+          const response = await fetch("/admin/add-code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ code }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showAlert(
+              alertBox,
+              `✅ تم إضافة الكود <strong>${code.toUpperCase()}</strong> بنجاح`,
+              "success",
+              5000,
+            );
+            newCodeInput.value = "";
+            newCodeInput.focus();
+            loadCodes();
+          } else {
+            showAlert(
+              alertBox,
+              data.message || "❌ فشل في إضافة الكود",
+              "danger",
+            );
+          }
+        } catch (error) {
+          console.error("Add code error:", error);
+          showAlert(alertBox, "❌ خطأ في الاتصال بالسيرفر", "danger");
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+
+      // 🗑️ حذف كود
+      async function deleteCode(code) {
+        if (
+          !confirm(
+            `هل أنت متأكد من حذف الكود "${code}"؟\n\n⚠️ لا يمكن التراجع عن هذا الإجراء.`,
+          )
+        )
+          return;
+
+        try {
+          const response = await fetch(`/admin/delete-code/${code}`, {
+            method: "DELETE",
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showAlert(
+              alertBox,
+              `✅ تم حذف الكود <strong>${code}</strong> بنجاح`,
+              "success",
+              5000,
+            );
+            loadCodes();
+          } else {
+            showAlert(
+              alertBox,
+              data.message || "❌ فشل في حذف الكود",
+              "danger",
+            );
+          }
+        } catch (error) {
+          console.error("Delete code error:", error);
+          showAlert(alertBox, "❌ خطأ في الاتصال بالسيرفر", "danger");
+        }
+      }
+
+      // 📊 تحديث الإحصائيات
+      function updateStats(codes) {
+        if (!Array.isArray(codes)) return;
+
+        const total = codes.length;
+        const used = codes.filter((c) => c.used).length;
+        const available = total - used;
+
+        // عدد الأجهزة الفريدة
+        const deviceIds = codes
+          .filter((c) => c.deviceId)
+          .map((c) => c.deviceId);
+        const uniqueDevices = [...new Set(deviceIds)].length;
+
+        totalCount.textContent = total.toLocaleString();
+        usedCount.textContent = used.toLocaleString();
+        availableCount.textContent = available.toLocaleString();
+        devicesCount.textContent = uniqueDevices.toLocaleString();
+
+        // تحديث الترويسة
+        headerStats.innerHTML = `
+          المجموع: <strong>${total}</strong> كود | 
+          المفعلة: <strong>${used}</strong> | 
+          المتاحة: <strong>${available}</strong> | 
+          الأجهزة: <strong>${uniqueDevices}</strong>
+        `;
+      }
+
+      // 📈 تحميل الإحصائيات
+      async function loadStats() {
+        try {
+          const response = await fetch("/admin/stats");
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              // تحديث حالة قاعدة البيانات
+              const healthResponse = await fetch("/health");
+              if (healthResponse.ok) {
+                const health = await healthResponse.json();
+                if (health.database === "connected") {
+                  dbStatus.innerHTML =
+                    '<span class="status-dot active"></span><span>MongoDB متصل</span>';
+                } else {
+                  dbStatus.innerHTML =
+                    '<span class="status-dot inactive"></span><span>MongoDB غير متصل</span>';
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error loading stats:", error);
+          dbStatus.innerHTML =
+            '<span class="status-dot inactive"></span><span>خطأ في الاتصال</span>';
+        }
+      }
+
+      // 🔐 عرض Modal لتغيير كلمة السر
+      function showChangePasswordModal() {
+        changePasswordModal.style.display = "flex";
+        document.getElementById("currentPassword").value = "";
+        document.getElementById("newPassword").value = "";
+        document.getElementById("confirmPassword").value = "";
+        passwordAlert.style.display = "none";
+      }
+
+      function hideChangePasswordModal() {
+        changePasswordModal.style.display = "none";
+      }
+
+      // 🔐 تغيير كلمة السر
+      async function changePassword() {
+        const currentPassword = document
+          .getElementById("currentPassword")
+          .value.trim();
+        const newPassword = document.getElementById("newPassword").value.trim();
+        const confirmPassword = document
+          .getElementById("confirmPassword")
+          .value.trim();
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+          showAlert(passwordAlert, "جميع الحقول مطلوبة", "danger");
+          return;
+        }
+
+        if (newPassword.length < 6) {
+          showAlert(
+            passwordAlert,
+            "كلمة السر الجديدة يجب أن تكون 6 أحرف على الأقل",
+            "danger",
+          );
+          return;
+        }
+
+        if (newPassword !== confirmPassword) {
+          showAlert(passwordAlert, "كلمتا السر غير متطابقتين", "danger");
+          return;
+        }
+
+        try {
+          const response = await fetch("/admin/change-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              currentPassword,
+              newPassword,
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            showAlert(passwordAlert, "✅ تم تغيير كلمة السر بنجاح", "success");
+
+            // إغلاق المودال بعد 2 ثانية
+            setTimeout(() => {
+              hideChangePasswordModal();
+              showAlert(
+                alertBox,
+                "✅ تم تغيير كلمة السر بنجاح. سجل الدخول مرة أخرى.",
+                "success",
+                5000,
+              );
+
+              // تسجيل الخروج تلقائياً
+              setTimeout(() => {
+                logout();
+              }, 2000);
+            }, 2000);
+          } else {
+            showAlert(passwordAlert, `❌ ${data.message}`, "danger");
+          }
+        } catch (error) {
+          console.error("Change password error:", error);
+          showAlert(passwordAlert, "❌ خطأ في تغيير كلمة السر", "danger");
+        }
+      }
+
+      // 🔍 عرض تفاصيل الكود
+      function showCodeDetails(code) {
+        alert(
+          `تفاصيل الكود:\n\nالكود: ${code}\n\nاستخدم زر تحديث لرؤية أحدث المعلومات.`,
+        );
+      }
+
+      // 💬 عرض رسائل التنبيه
+      function showAlert(element, message, type, timeout = 5000) {
+        element.innerHTML = message;
+        element.className = `alert alert-${type}`;
+        element.style.display = "block";
+
+        if (timeout > 0) {
+          setTimeout(() => {
+            element.style.display = "none";
+          }, timeout);
+        }
+      }
+
+      // 🎯 إضافة مستمعات الأحداث
+      document.addEventListener("DOMContentLoaded", () => {
+        // إدخال بالإنتر
+        newCodeInput.addEventListener("keypress", (e) => {
+          if (e.key === "Enter") addCode();
+        });
+
+        adminKeyInput.addEventListener("keypress", (e) => {
+          if (e.key === "Enter") login();
+        });
+
+        // إغلاق المودالات عند النقر خارجها
+        window.addEventListener("click", (e) => {
+          if (e.target === changePasswordModal) {
+            hideChangePasswordModal();
+          }
+        });
+
+        // إغلاق المودالات بالزر ESC
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape") {
+            hideChangePasswordModal();
+          }
+        });
+
+        // تركيز على حقل الإدخال
+        adminKeyInput.focus();
+
+        // تحديث الإحصائيات كل 30 ثانية
+        setInterval(() => {
+          if (dashboard.style.display !== "none") {
+            loadStats();
+          }
+        }, 30000);
+      });
+
+      // 🔄 تحديث تلقائي للقائمة كل 60 ثانية
+      setInterval(() => {
+        if (
+          dashboard.style.display !== "none" &&
+          document.visibilityState === "visible"
+        ) {
+          loadCodes();
+        }
+      }, 60000);
+    </script>
+  </body>
+</html>
