@@ -1,16 +1,67 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const session = require("express-session");
+const MongoStore = require("connect-mongo");
 const bcrypt = require("bcrypt");
 const path = require("path");
-require("dotenv").config(); // هذا السطر مهم جداً!
-const app = express();
-app.use(express.json());
-app.use(express.static("public"));
+require("dotenv").config();
 
-// ==========================
-// 🔗 MongoDB Connection
-// ==========================
+const app = express();
+
+// إعداد trust proxy لـ Render
+app.set('trust proxy', 1);
+
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// إعداد الجلسة مع connect-mongo للتخزين في MongoDB
+app.use(
+  session({
+    name: 'motamayez.session',
+    secret: process.env.SESSION_SECRET || "your-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60, // 24 ساعة
+      autoRemove: 'native'
+    }),
+    cookie: {
+      secure: process.env.NODE_ENV === 'production', // يجب أن يكون true في الإنتاج
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 ساعة
+      path: '/'
+    }
+  })
+);
+
+// CORS Middleware
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'https://your-app.onrender.com',
+    'http://localhost:3000',
+    'http://localhost:5000'
+  ];
+  const origin = req.headers.origin;
+
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// تأخير الاتصال بقاعدة البيانات حتى يتم تهيئة التطبيق
 const MONGODB_URI = process.env.MONGODB_URI;
 
 mongoose.connect(MONGODB_URI, {
@@ -19,8 +70,6 @@ mongoose.connect(MONGODB_URI, {
 })
 .then(async () => {
   console.log("✅ Connected to MongoDB Atlas");
-  
-  // تهيئة كلمة السر الافتراضية للأدمن إذا لم تكن موجودة
   await initializeDefaultAdmin();
 })
 .catch((err) => {
@@ -28,12 +77,9 @@ mongoose.connect(MONGODB_URI, {
   process.exit(1);
 });
 
-// ==========================
-// 🗂️ Mongoose Schemas & Models
-// ==========================
+// النماذج والوظائف المساعدة
 const SALT_ROUNDS = 10;
 
-// نموذج كود التفعيل
 const codeSchema = new mongoose.Schema({
   code: { 
     type: String, 
@@ -60,7 +106,6 @@ const codeSchema = new mongoose.Schema({
   }
 });
 
-// نموذج إعدادات الأدمن
 const adminSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -85,15 +130,11 @@ const adminSchema = new mongoose.Schema({
 const ActivationCode = mongoose.model("ActivationCode", codeSchema);
 const AdminConfig = mongoose.model("AdminConfig", adminSchema);
 
-// ==========================
-// 🛠️ Helper Functions
-// ==========================
 async function initializeDefaultAdmin() {
   try {
     const adminExists = await AdminConfig.findOne({ username: "admin" });
     
     if (!adminExists) {
-      // كلمة السر الافتراضية: "admin123"
       const hashedPassword = await bcrypt.hash("admin123", SALT_ROUNDS);
       
       await AdminConfig.create({
@@ -134,17 +175,14 @@ async function changeAdminPassword(currentPassword, newPassword) {
       return { success: false, message: "Admin not found" };
     }
     
-    // التحقق من كلمة السر الحالية
     const isValid = await bcrypt.compare(currentPassword, admin.password);
     
     if (!isValid) {
       return { success: false, message: "Current password is incorrect" };
     }
     
-    // تشفير كلمة السر الجديدة
     const hashedNewPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
     
-    // تحديث كلمة السر
     admin.password = hashedNewPassword;
     admin.lastChanged = new Date();
     await admin.save();
@@ -156,24 +194,6 @@ async function changeAdminPassword(currentPassword, newPassword) {
   }
 }
 
-// ==========================
-// 📦 Session
-// ==========================
-app.use(
-  session({
-    secret: "motamayez-secret-2026-" + Date.now(), // مفتاح عشوائي
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000 // 24 ساعة
-    }
-  })
-);
-
-// ==========================
-// 🛡️ Middleware
-// ==========================
 function adminOnly(req, res, next) {
   if (!req.session.admin) {
     return res.status(401).json({ 
@@ -185,8 +205,10 @@ function adminOnly(req, res, next) {
 }
 
 // ==========================
-// 🔑 تسجيل دخول الأدمن (مع MongoDB)
+// Routes
 // ==========================
+
+// تسجيل دخول الأدمن
 app.post("/admin/login", async (req, res) => {
   const { key } = req.body;
 
@@ -202,11 +224,24 @@ app.post("/admin/login", async (req, res) => {
     
     if (isValid) {
       req.session.admin = true;
-      req.session.save();
+      req.session.userId = "admin";
+      req.session.loginTime = new Date();
       
-      return res.json({ 
-        success: true, 
-        message: "Login successful" 
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ 
+            success: false, 
+            message: "Server error" 
+          });
+        }
+        
+        console.log("✅ Admin logged in successfully");
+        return res.json({ 
+          success: true, 
+          message: "Login successful",
+          sessionId: req.sessionID
+        });
       });
     } else {
       return res.status(401).json({ 
@@ -223,9 +258,7 @@ app.post("/admin/login", async (req, res) => {
   }
 });
 
-// ==========================
-// 🔐 تغيير كلمة سر الأدمن
-// ==========================
+// تغيير كلمة سر الأدمن
 app.post("/admin/change-password", adminOnly, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
@@ -247,7 +280,6 @@ app.post("/admin/change-password", adminOnly, async (req, res) => {
     const result = await changeAdminPassword(currentPassword, newPassword);
     
     if (result.success) {
-      // إلغاء جميع الجلسات الحالية (إجبار إعادة تسجيل الدخول)
       req.session.destroy();
       
       res.json({ 
@@ -269,9 +301,7 @@ app.post("/admin/change-password", adminOnly, async (req, res) => {
   }
 });
 
-// ==========================
-// 🔓 API التفعيل (Flutter)
-// ==========================
+// تفعيل الكود (للتطبيق)
 app.post("/activate", async (req, res) => {
   const { code, deviceId } = req.body;
 
@@ -286,7 +316,6 @@ app.post("/activate", async (req, res) => {
     const normalizedCode = code.trim().toUpperCase();
     const entry = await ActivationCode.findOne({ code: normalizedCode });
 
-    // ❌ الكود غير موجود
     if (!entry) {
       return res.json({
         success: false,
@@ -294,7 +323,6 @@ app.post("/activate", async (req, res) => {
       });
     }
 
-    // ❌ الكود مستخدم من جهاز آخر
     if (entry.used && entry.deviceId !== deviceId) {
       return res.status(403).json({
         success: false,
@@ -302,7 +330,6 @@ app.post("/activate", async (req, res) => {
       });
     }
 
-    // ✅ الكود مستخدم من نفس الجهاز (إعادة تشغيل)
     if (entry.used && entry.deviceId === deviceId) {
       return res.json({
         success: true,
@@ -310,7 +337,6 @@ app.post("/activate", async (req, res) => {
       });
     }
 
-    // ✅ أول تفعيل
     entry.used = true;
     entry.deviceId = deviceId;
     entry.activatedAt = new Date();
@@ -333,9 +359,7 @@ app.post("/activate", async (req, res) => {
   }
 });
 
-// ==========================
-// 🔐 Admin APIs
-// ==========================
+// الحصول على جميع الأكواد (للأدمن)
 app.get("/admin/codes", adminOnly, async (req, res) => {
   try {
     const codes = await ActivationCode.find().sort({ createdAt: -1 });
@@ -346,6 +370,7 @@ app.get("/admin/codes", adminOnly, async (req, res) => {
   }
 });
 
+// إضافة كود جديد (للأدمن)
 app.post("/admin/add-code", adminOnly, async (req, res) => {
   const { code } = req.body;
 
@@ -356,7 +381,6 @@ app.post("/admin/add-code", adminOnly, async (req, res) => {
   try {
     const normalizedCode = code.trim().toUpperCase();
 
-    // التحقق من وجود الكود
     const existingCode = await ActivationCode.findOne({ code: normalizedCode });
     if (existingCode) {
       return res.status(400).json({ message: "Code already exists" });
@@ -380,6 +404,7 @@ app.post("/admin/add-code", adminOnly, async (req, res) => {
   }
 });
 
+// حذف كود (للأدمن)
 app.delete("/admin/delete-code/:code", adminOnly, async (req, res) => {
   try {
     const { code } = req.params;
@@ -401,25 +426,20 @@ app.delete("/admin/delete-code/:code", adminOnly, async (req, res) => {
   }
 });
 
-// ==========================
-// 📊 الحصول على الإحصائيات
-// ==========================
+// الحصول على الإحصائيات (للأدمن)
 app.get("/admin/stats", adminOnly, async (req, res) => {
   try {
     const totalCodes = await ActivationCode.countDocuments();
     const usedCodes = await ActivationCode.countDocuments({ used: true });
     const availableCodes = totalCodes - usedCodes;
     
-    // عدد الأجهزة الفريدة المفعلة
     const activatedDevices = await ActivationCode.distinct("deviceId", { used: true });
     const uniqueDevices = activatedDevices.filter(id => id !== null).length;
     
-    // آخر 10 تفعيلات
     const recentActivations = await ActivationCode.find({ used: true })
       .sort({ activatedAt: -1 })
       .limit(10);
     
-    // إحصائيات الأدمن
     const adminInfo = await AdminConfig.findOne({ username: "admin" });
     
     res.json({
@@ -439,9 +459,7 @@ app.get("/admin/stats", adminOnly, async (req, res) => {
   }
 });
 
-// ==========================
-// 🏥 Health Check
-// ==========================
+// Health check
 app.get("/health", async (req, res) => {
   try {
     const dbStatus = mongoose.connection.readyState === 1 ? "connected" : "disconnected";
@@ -460,12 +478,38 @@ app.get("/health", async (req, res) => {
   }
 });
 
-// ==========================
-// 🚀 Start Server
-// ==========================
+// Debug route للتحقق من الجلسة
+app.get("/debug/session", (req, res) => {
+  res.json({
+    sessionId: req.sessionID,
+    admin: req.session.admin,
+    userId: req.session.userId,
+    loginTime: req.session.loginTime,
+    cookie: req.session.cookie
+  });
+});
+
+// Debug route للتحقق من الكوكيز
+app.get("/debug/cookies", (req, res) => {
+  res.json({
+    cookies: req.cookies,
+    signedCookies: req.signedCookies,
+    headers: req.headers.cookie
+  });
+});
+
+// Route لخدمة صفحة الإدارة
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// بدء الخادم
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`🔗 MongoDB URI: ${MONGODB_URI ? 'Configured' : 'Not configured'}`);
-  console.log(`🔐 Admin authentication: MongoDB`);
 });

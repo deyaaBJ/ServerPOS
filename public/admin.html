@@ -972,20 +972,31 @@
         try {
           const response = await fetch("/admin/login", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
             body: JSON.stringify({ key }),
+            credentials: "include", // مهم لـ Render
           });
 
           const data = await response.json();
+          console.log("Login response:", data);
 
           if (data.success) {
             loginBox.style.display = "none";
             dashboard.style.display = "block";
             showAlert(alertBox, "✅ تم تسجيل الدخول بنجاح", "success", 3000);
+
+            // تحقق من الجلسة
+            setTimeout(() => {
+              checkSession();
+            }, 100);
+
             loadCodes();
             loadStats();
           } else {
-            showAlert(loginAlert, "❌ كلمة السر خاطئة", "danger");
+            showAlert(loginAlert, "❌ " + data.message, "danger");
             adminKeyInput.value = "";
             adminKeyInput.focus();
           }
@@ -1014,10 +1025,15 @@
         codesTable.innerHTML = "";
 
         try {
-          const response = await fetch("/admin/codes");
+          const response = await fetch("/admin/codes", {
+            method: "GET",
+            credentials: "include", // مهم لـ Render
+          });
+
           if (!response.ok) {
-            throw new Error("Network response was not ok");
+            throw new Error(`Network response was not ok: ${response.status}`);
           }
+
           const codes = await response.json();
 
           // تحديث الإحصائيات
@@ -1060,7 +1076,6 @@
             const formatDateEnglish = (date) => {
               if (!date) return "-";
               const d = new Date(date);
-              // تنسيق: YYYY-MM-DD HH:MM
               const year = d.getFullYear();
               const month = String(d.getMonth() + 1).padStart(2, "0");
               const day = String(d.getDate()).padStart(2, "0");
@@ -1154,8 +1169,12 @@
         try {
           const response = await fetch("/admin/add-code", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
             body: JSON.stringify({ code }),
+            credentials: "include", // مهم لـ Render
           });
 
           const data = await response.json();
@@ -1198,6 +1217,7 @@
         try {
           const response = await fetch(`/admin/delete-code/${code}`, {
             method: "DELETE",
+            credentials: "include", // مهم لـ Render
           });
 
           const data = await response.json();
@@ -1254,7 +1274,9 @@
       // 📈 تحميل الإحصائيات
       async function loadStats() {
         try {
-          const response = await fetch("/admin/stats");
+          const response = await fetch("/admin/stats", {
+            credentials: "include",
+          });
           if (response.ok) {
             const data = await response.json();
             if (data.success) {
@@ -1324,11 +1346,15 @@
         try {
           const response = await fetch("/admin/change-password", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
             body: JSON.stringify({
               currentPassword,
               newPassword,
             }),
+            credentials: "include", // مهم لـ Render
           });
 
           const data = await response.json();
@@ -1380,6 +1406,19 @@
         }
       }
 
+      // 🔍 فحص حالة الجلسة
+      async function checkSession() {
+        try {
+          const response = await fetch("/debug/session", {
+            credentials: "include",
+          });
+          const data = await response.json();
+          console.log("Current session:", data);
+        } catch (error) {
+          console.error("Session check error:", error);
+        }
+      }
+
       // 🎯 إضافة مستمعات الأحداث
       document.addEventListener("DOMContentLoaded", () => {
         // إدخال بالإنتر
@@ -1407,6 +1446,24 @@
 
         // تركيز على حقل الإدخال
         adminKeyInput.focus();
+
+        // تحميل حالة الاتصال بقاعدة البيانات
+        fetch("/health")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.database === "connected") {
+              dbStatus.innerHTML =
+                '<span class="status-dot active"></span><span>MongoDB متصل</span>';
+            } else {
+              dbStatus.innerHTML =
+                '<span class="status-dot inactive"></span><span>MongoDB غير متصل</span>';
+            }
+          })
+          .catch((err) => {
+            console.error("Health check error:", err);
+            dbStatus.innerHTML =
+              '<span class="status-dot inactive"></span><span>خطأ في الاتصال</span>';
+          });
 
         // تحديث الإحصائيات كل 30 ثانية
         setInterval(() => {
