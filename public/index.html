@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لوحة تحكم أدمن المتميز</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Login View -->
+      <div id="loginView" class="view">
+        <div class="card login-card">
+          <div class="header">
+            <div class="header-badge">
+              <span>🔒 نظام آمن</span>
+            </div>
+            <h1>👑 لوحة تحكم أدمن المتميز</h1>
+            <p>إدارة أكواد تفعيل برنامج المتميز</p>
+          </div>
+          <div class="content">
+            <div id="loginAlert" class="alert hidden"></div>
+            <form id="loginForm">
+              <div class="form-group">
+                <label for="adminKey">🔑 كلمة سر الأدمن</label>
+                <input
+                  type="password"
+                  id="adminKey"
+                  class="form-control"
+                  placeholder="أدخل كلمة السر"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">
+                <span>🚀 تسجيل الدخول</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard View -->
+      <div id="dashboardView" class="view hidden">
+        <div class="card">
+          <div class="header">
+            <div class="header-badge" id="dbStatus">
+              <span class="status-dot active"></span>
+              <span>متصل</span>
+            </div>
+            <h1>📋 إدارة أكواد التفعيل</h1>
+            <p id="headerStats">جاري التحميل...</p>
+          </div>
+
+          <div class="content">
+            <div id="mainAlert" class="alert hidden"></div>
+
+            <!-- Dashboard Header -->
+            <div class="dashboard-header">
+              <div>
+                <h2>مرحباً بك، الأدمن</h2>
+                <p>إدارة أكواد تفعيل برنامج المتميز</p>
+              </div>
+              <div class="header-actions">
+                <button id="refreshBtn" class="btn btn-secondary">
+                  <span>🔄 تحديث</span>
+                </button>
+                <button id="changePasswordBtn" class="btn btn-warning">
+                  <span>🔐 تغيير كلمة السر</span>
+                </button>
+                <button id="logoutBtn" class="btn btn-danger">
+                  <span>🚪 تسجيل الخروج</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid" id="statsGrid">
+              <!-- Stats injected by JS -->
+            </div>
+
+            <!-- Add Code Form -->
+            <div class="add-code-form">
+              <h3>➕ إضافة كود جديد</h3>
+              <form id="addCodeForm">
+                <div class="form-row">
+                  <input
+                    type="text"
+                    id="newCode"
+                    class="form-control"
+                    placeholder="أدخل كود التفعيل الجديد"
+                    maxlength="50"
+                    required
+                  />
+                  <button type="submit" class="btn btn-success">
+                    <span>✅ إضافة الكود</span>
+                  </button>
+                </div>
+                <div class="form-hint">
+                  💡 سيتم تحويل الكود تلقائياً إلى أحرف كبيرة
+                </div>
+              </form>
+            </div>
+
+            <!-- Codes Table -->
+            <div class="table-section">
+              <h3>📋 قائمة الأكواد</h3>
+              <div id="loadingState" class="loading">جاري تحميل الأكواد...</div>
+              <div class="table-container hidden" id="tableContainer">
+                <table id="codesTable">
+                  <thead>
+                    <tr>
+                      <th>الكود</th>
+                      <th>الحالة</th>
+                      <th>رقم الجهاز</th>
+                      <th>تاريخ التفعيل</th>
+                      <th>تاريخ الإنشاء</th>
+                      <th>الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody id="codesTableBody">
+                    <!-- Rows injected by JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div id="emptyState" class="empty-state hidden">
+                <div class="empty-state-icon">📭</div>
+                <h3>لا توجد أكواد بعد</h3>
+                <p>ابدأ بإضافة أول كود تفعيل</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div id="passwordModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🔐 تغيير كلمة السر</h3>
+          <button class="modal-close" id="closeModalBtn">&times;</button>
+        </div>
+        <form id="passwordForm">
+          <div class="modal-body">
+            <div id="passwordAlert" class="alert hidden"></div>
+            <div class="form-group">
+              <label for="currentPassword">كلمة السر الحالية</label>
+              <input
+                type="password"
+                id="currentPassword"
+                class="form-control"
+                placeholder="أدخل كلمة السر الحالية"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="newPassword">كلمة السر الجديدة</label>
+              <input
+                type="password"
+                id="newPassword"
+                class="form-control"
+                placeholder="6 أحرف على الأقل"
+                minlength="6"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="confirmPassword">تأكيد كلمة السر</label>
+              <input
+                type="password"
+                id="confirmPassword"
+                class="form-control"
+                placeholder="أعد إدخال كلمة السر الجديدة"
+                required
+              />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              id="cancelPasswordBtn"
+            >
+              إلغاء
+            </button>
+            <button type="submit" class="btn btn-success">
+              💾 حفظ التغييرات
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Code Details Modal -->
+    <div id="detailsModal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🔍 تفاصيل الكود</h3>
+          <button class="modal-close" id="closeDetailsBtn">&times;</button>
+        </div>
+        <div class="modal-body" id="detailsContent">
+          <!-- Content injected by JS -->
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="closeDetailsFooterBtn">
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+  </body>
+</html>
