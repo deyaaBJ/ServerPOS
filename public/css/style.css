@@ -407,6 +407,11 @@ tr.highlight {
   color: #155724;
 }
 
+.badge-primary {
+  background: rgba(106, 17, 203, 0.12);
+  color: #5a0db4;
+}
+
 .badge-danger {
   background: #f8d7da;
   color: #721c24;
@@ -470,6 +475,24 @@ tr.highlight {
   background: #339af0;
 }
 
+.approve-btn {
+  background: #20c997;
+  color: white;
+}
+
+.approve-btn:hover {
+  background: #12b886;
+}
+
+.reject-btn {
+  background: #e03131;
+  color: white;
+}
+
+.reject-btn:hover {
+  background: #c92a2a;
+}
+
 /* Status Indicators */
 .status-indicator {
   display: inline-flex;
@@ -510,6 +533,37 @@ tr.highlight {
   font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: 0.5px;
+}
+
+.request-device {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.request-id {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  direction: ltr;
+}
+
+.request-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.request-code-input {
+  min-width: 180px;
+  max-width: 240px;
+  padding: 10px 14px;
+}
+
+.request-note {
+  margin-top: 8px;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
 }
 
 /* Loading */
@@ -719,9 +773,19 @@ tr.highlight {
   .action-buttons {
     flex-direction: column;
   }
-  
+
+  .request-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .action-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .request-code-input {
+    max-width: none;
+    min-width: auto;
   }
 }

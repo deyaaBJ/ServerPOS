@@ -37,16 +37,13 @@ const adminSchema = new mongoose.Schema({
 adminSchema.index({ username: 1 });
 
 // Hash password before saving
-adminSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(SALT_ROUNDS);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
+adminSchema.pre('save', async function() {
+  if (!this.isModified('password')) {
+    return;
   }
+
+  const salt = await bcrypt.genSalt(SALT_ROUNDS);
+  this.password = await bcrypt.hash(this.password, salt);
 });
 
 // Compare password method

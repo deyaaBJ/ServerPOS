@@ -2,11 +2,29 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { adminOnly } = require('../middleware/auth');
-const { validateLogin, validateChangePassword } = require('../middleware/validator');
+const {
+  validateLogin,
+  validateChangePassword,
+  validateApproveActivationRequest,
+  validateRejectActivationRequest
+} = require('../middleware/validator');
 
 router.post('/login', validateLogin, adminController.login);
 router.post('/change-password', adminOnly, validateChangePassword, adminController.changePassword);
 router.get('/stats', adminOnly, adminController.getStats);
+router.get('/activation-requests', adminOnly, adminController.getActivationRequests);
+router.post(
+  '/activation-requests/:requestId/approve',
+  adminOnly,
+  validateApproveActivationRequest,
+  adminController.approveActivationRequest
+);
+router.post(
+  '/activation-requests/:requestId/reject',
+  adminOnly,
+  validateRejectActivationRequest,
+  adminController.rejectActivationRequest
+);
 router.post('/logout', adminOnly, adminController.logout);
 
 module.exports = router;

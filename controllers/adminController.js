@@ -1,5 +1,6 @@
 const Admin = require('../models/Admin');
 const ActivationCode = require('../models/ActivationCode');
+const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 
 // Login
@@ -94,6 +95,7 @@ exports.getStats = asyncHandler(async (req, res) => {
     usedCodes,
     availableCodes,
     uniqueDevices,
+    pendingRequests,
     recentActivations,
     adminInfo
   ] = await Promise.all([
@@ -101,6 +103,7 @@ exports.getStats = asyncHandler(async (req, res) => {
     ActivationCode.countDocuments({ used: true }),
     ActivationCode.countDocuments({ used: false }),
     ActivationCode.distinct('deviceId', { used: true, deviceId: { $ne: null } }),
+    ActivationRequest.countDocuments({ status: 'pending' }),
     ActivationCode.find({ used: true })
       .sort({ activatedAt: -1 })
       .limit(10)
@@ -115,9 +118,88 @@ exports.getStats = asyncHandler(async (req, res) => {
       usedCodes,
       availableCodes,
       uniqueDevices: uniqueDevices.length,
+      pendingRequests,
       lastPasswordChange: adminInfo?.lastChanged
     },
     recentActivations
+  });
+});
+
+exports.getActivationRequests = asyncHandler(async (req, res) => {
+  const requests = await ActivationRequest.find()
+    .sort({ createdAt: -1 })
+    .limit(100);
+
+  res.json({
+    success: true,
+    requests
+  });
+});
+
+exports.approveActivationRequest = asyncHandler(async (req, res) => {
+  const { requestId } = req.params;
+  const normalizedCode = req.body.code.toUpperCase().trim();
+
+  const [request, codeEntry] = await Promise.all([
+    ActivationRequest.findById(requestId),
+    ActivationCode.findByCode(normalizedCode)
+  ]);
+
+  if (!request) {
+    throw new AppError('Activation request not found', 404);
+  }
+
+  if (request.status === 'completed') {
+    throw new AppError('Activation request is already completed', 400);
+  }
+
+  if (!codeEntry) {
+    throw new AppError('Activation code not found', 404);
+  }
+
+  if (codeEntry.used && codeEntry.deviceId !== request.deviceId) {
+    throw new AppError('This code is already activated on another device', 409);
+  }
+
+  request.status = 'approved';
+  request.assignedCode = normalizedCode;
+  request.approvedAt = new Date();
+  request.rejectedAt = null;
+  request.rejectionReason = null;
+  await request.save();
+
+  res.json({
+    success: true,
+    message: 'Activation request approved successfully',
+    request
+  });
+});
+
+exports.rejectActivationRequest = asyncHandler(async (req, res) => {
+  const { requestId } = req.params;
+  const reason = req.body.reason?.trim() || null;
+
+  const request = await ActivationRequest.findById(requestId);
+
+  if (!request) {
+    throw new AppError('Activation request not found', 404);
+  }
+
+  if (request.status === 'completed') {
+    throw new AppError('Completed activation requests cannot be rejected', 400);
+  }
+
+  request.status = 'rejected';
+  request.assignedCode = null;
+  request.approvedAt = null;
+  request.rejectedAt = new Date();
+  request.rejectionReason = reason;
+  await request.save();
+
+  res.json({
+    success: true,
+    message: 'Activation request rejected successfully',
+    request
   });
 });
 

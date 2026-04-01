@@ -1,34 +1,28 @@
-﻿/**
+/**
  * Admin Dashboard Application
  * Modern ES6+ JavaScript with modular architecture
  */
 
-// Configuration
 const CONFIG = {
   API_BASE_URL: '',
-  REFRESH_INTERVAL: 60000, // 1 minute
-  STATS_REFRESH_INTERVAL: 30000, // 30 seconds
-  HIGHLIGHT_DURATION: 300000, // 5 minutes
+  REFRESH_INTERVAL: 60000,
+  STATS_REFRESH_INTERVAL: 30000,
+  HIGHLIGHT_DURATION: 300000,
 };
 
-// State Management
 const state = {
   isLoggedIn: false,
   codes: [],
+  requests: [],
   stats: {},
   currentView: 'login',
   refreshTimer: null,
   statsTimer: null,
 };
 
-// DOM Elements Cache
 const elements = {};
 
-// Utility Functions
 const utils = {
-  /**
-   * Format date to Arabic locale
-   */
   formatDate: (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -40,9 +34,6 @@ const utils = {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
   },
 
-  /**
-   * Show alert message
-   */
   showAlert: (elementId, message, type = 'info', duration = 5000) => {
     const element = elements[elementId] || document.getElementById(elementId);
     if (!element) return;
@@ -58,9 +49,6 @@ const utils = {
     }
   },
 
-  /**
-   * Hide alert
-   */
   hideAlert: (elementId) => {
     const element = elements[elementId] || document.getElementById(elementId);
     if (element) {
@@ -68,39 +56,32 @@ const utils = {
     }
   },
 
-  /**
-   * Debounce function
-   */
-  debounce: (func, wait) => {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  },
-
-  /**
-   * Check if code is recently added (for highlighting)
-   */
   isRecent: (createdAt) => {
     const created = new Date(createdAt);
-    const now = new Date();
-    return (now - created) < CONFIG.HIGHLIGHT_DURATION;
+    return (new Date() - created) < CONFIG.HIGHLIGHT_DURATION;
   },
+
+  getRequestStatusBadge: (request) => {
+    if (request.status === 'completed') {
+      return '<span class="badge badge-success">تم التفعيل</span>';
+    }
+
+    if (request.status === 'approved') {
+      return '<span class="badge badge-warning">بانتظار إدخال الكود</span>';
+    }
+
+    if (request.status === 'rejected') {
+      return '<span class="badge badge-danger">مرفوض</span>';
+    }
+
+    return '<span class="badge badge-primary">معلق</span>';
+  }
 };
 
-// API Service
 const api = {
-  /**
-   * Make authenticated API request
-   */
   request: async (endpoint, options = {}) => {
     const url = `${CONFIG.API_BASE_URL}/api${endpoint}`;
-    
+
     const config = {
       credentials: 'include',
       headers: {
@@ -115,121 +96,168 @@ const api = {
       config.body = JSON.stringify(config.body);
     }
 
-    try {
-      const response = await fetch(url, config);
-      const data = await response.json();
+    const response = await fetch(url, config);
+    const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}`);
-      }
-
-      return data;
-    } catch (error) {
-      console.error('API Error:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP ${response.status}`);
     }
+
+    return data;
   },
 
-  // Auth endpoints
   auth: {
     login: (key) => api.request('/admin/login', {
       method: 'POST',
       body: { key },
     }),
-    
     logout: () => api.request('/admin/logout', { method: 'POST' }),
-    
-    changePassword: (currentPassword, newPassword) => 
+    changePassword: (currentPassword, newPassword, confirmPassword) =>
       api.request('/admin/change-password', {
         method: 'POST',
-        body: { currentPassword, newPassword },
+        body: { currentPassword, newPassword, confirmPassword },
       }),
-    
     getStats: () => api.request('/admin/stats'),
+    getActivationRequests: () => api.request('/admin/activation-requests'),
+    approveRequest: (requestId, code) =>
+      api.request(`/admin/activation-requests/${requestId}/approve`, {
+        method: 'POST',
+        body: { code },
+      }),
+    rejectRequest: (requestId, reason) =>
+      api.request(`/admin/activation-requests/${requestId}/reject`, {
+        method: 'POST',
+        body: { reason },
+      }),
   },
 
-  // Codes endpoints
   codes: {
     getAll: () => api.request('/codes/'),
-    
     add: (code) => api.request('/codes/add', {
       method: 'POST',
       body: { code },
     }),
-    
     delete: (code) => api.request(`/codes/${code}`, {
       method: 'DELETE',
     }),
-    
     getDetails: (code) => api.request(`/codes/${code}`),
   },
-
-  // Activation endpoint
-  activate: (code, deviceId) => api.request('/activate', {
-    method: 'POST',
-    body: { code, deviceId },
-  }),
 };
 
-// View Management
 const views = {
-  /**
-   * Switch between views
-   */
   switch: (viewName) => {
-    // Hide all views
-    document.querySelectorAll('.view').forEach(el => {
+    document.querySelectorAll('.view').forEach((el) => {
       el.classList.add('hidden');
     });
 
-    // Show target view
     const targetView = document.getElementById(`${viewName}View`);
     if (targetView) {
       targetView.classList.remove('hidden');
       state.currentView = viewName;
     }
 
-    // Update body class for styling
     document.body.className = `view-${viewName}`;
   },
 
-  /**
-   * Render stats cards
-   */
   renderStats: (stats) => {
     const container = elements.statsGrid;
     if (!container) return;
 
     const statsData = [
-      { icon: '📊', value: stats.totalCodes, label: 'إجمالي الأكواد', color: 'primary' },
-      { icon: '✅', value: stats.usedCodes, label: 'الأكواد المفعلة', color: 'success' },
-      { icon: '🆓', value: stats.availableCodes, label: 'الأكواد المتاحة', color: 'danger' },
-      { icon: '📱', value: stats.uniqueDevices, label: 'الأجهزة المفعلة', color: 'warning' },
+      { icon: '📊', value: stats.totalCodes, label: 'إجمالي الأكواد' },
+      { icon: '✅', value: stats.usedCodes, label: 'الأكواد المفعلة' },
+      { icon: '🆓', value: stats.availableCodes, label: 'الأكواد المتاحة' },
+      { icon: '📱', value: stats.uniqueDevices, label: 'الأجهزة المفعلة' },
+      { icon: '📨', value: stats.pendingRequests || 0, label: 'طلبات معلقة' },
     ];
 
     container.innerHTML = statsData.map((stat, index) => `
       <div class="stat-card" style="animation-delay: ${index * 0.1}s">
         <div class="stat-icon">${stat.icon}</div>
-        <h3>${stat.value.toLocaleString()}</h3>
+        <h3>${Number(stat.value || 0).toLocaleString()}</h3>
         <p>${stat.label}</p>
       </div>
     `).join('');
 
-    // Update header stats
     if (elements.headerStats) {
       elements.headerStats.innerHTML = `
         المجموع: <strong>${stats.totalCodes}</strong> كود |
         المفعلة: <strong>${stats.usedCodes}</strong> |
         المتاحة: <strong>${stats.availableCodes}</strong> |
-        الأجهزة: <strong>${stats.uniqueDevices}</strong>
+        الأجهزة: <strong>${stats.uniqueDevices}</strong> |
+        الطلبات المعلقة: <strong>${stats.pendingRequests || 0}</strong>
       `;
     }
   },
 
-  /**
-   * Render codes table
-   */
-  renderTable: (codes) => {
+  renderRequestsTable: (requests) => {
+    const tbody = elements.requestsTableBody;
+    const loadingEl = elements.requestsLoadingState;
+    const tableContainer = elements.requestsTableContainer;
+    const emptyState = elements.requestsEmptyState;
+
+    if (loadingEl) loadingEl.classList.add('hidden');
+
+    if (!requests || requests.length === 0) {
+      tableContainer?.classList.add('hidden');
+      emptyState?.classList.remove('hidden');
+      return;
+    }
+
+    tableContainer?.classList.remove('hidden');
+    emptyState?.classList.add('hidden');
+
+    tbody.innerHTML = requests.map((request) => `
+      <tr class="${utils.isRecent(request.createdAt) ? 'highlight' : ''}">
+        <td>
+          <div class="request-device">
+            <code class="date-text">${request.deviceId}</code>
+            <div class="request-id">ID: ${request._id}</div>
+          </div>
+        </td>
+        <td>${utils.getRequestStatusBadge(request)}</td>
+        <td>${request.assignedCode ? `<span class="code-text">${request.assignedCode}</span>` : '<span style="color: #999;">-</span>'}</td>
+        <td><span class="date-text">${utils.formatDate(request.createdAt)}</span></td>
+        <td><span class="date-text">${utils.formatDate(request.updatedAt)}</span></td>
+        <td>
+          <div class="request-actions">
+            <input
+              type="text"
+              class="form-control request-code-input"
+              data-request-id="${request._id}"
+              placeholder="أدخل كود للربط"
+              value="${request.assignedCode || ''}"
+              ${request.status === 'completed' ? 'disabled' : ''}
+            />
+            <button
+              class="action-btn approve-btn"
+              data-action="approve-request"
+              data-request-id="${request._id}"
+              ${request.status === 'completed' ? 'disabled' : ''}
+            >
+              ربط الكود
+            </button>
+            <button
+              class="action-btn reject-btn"
+              data-action="reject-request"
+              data-request-id="${request._id}"
+              ${request.status === 'completed' ? 'disabled' : ''}
+            >
+              رفض
+            </button>
+          </div>
+          ${request.status === 'rejected' && request.rejectionReason
+            ? `<div class="request-note">سبب الرفض: ${request.rejectionReason}</div>`
+            : ''}
+          ${request.status === 'approved'
+            ? '<div class="request-note">بعد إرسال هذا الكود لصاحب الجهاز، لن يعمل إلا لنفس الجهاز الذي قدّم الطلب.</div>'
+            : ''}
+        </td>
+      </tr>
+    `).join('');
+  },
+
+  renderCodesTable: (codes) => {
     const tbody = elements.codesTableBody;
     const loadingEl = elements.loadingState;
     const tableContainer = elements.tableContainer;
@@ -238,53 +266,42 @@ const views = {
     if (loadingEl) loadingEl.classList.add('hidden');
 
     if (!codes || codes.length === 0) {
-      if (tableContainer) tableContainer.classList.add('hidden');
-      if (emptyState) emptyState.classList.remove('hidden');
+      tableContainer?.classList.add('hidden');
+      emptyState?.classList.remove('hidden');
       return;
     }
 
-    if (tableContainer) tableContainer.classList.remove('hidden');
-    if (emptyState) emptyState.classList.add('hidden');
+    tableContainer?.classList.remove('hidden');
+    emptyState?.classList.add('hidden');
 
-    tbody.innerHTML = codes.map(code => {
-      const isRecent = utils.isRecent(code.createdAt);
+    tbody.innerHTML = codes.map((code) => {
       const statusBadge = code.used
-        ? `<span class="badge badge-danger">🔒 مفعل</span>`
-        : `<span class="badge badge-success">✅ متاح</span>`;
+        ? '<span class="badge badge-danger">🔒 مفعل</span>'
+        : '<span class="badge badge-success">✅ متاح</span>';
 
       return `
-        <tr class="${isRecent ? 'highlight' : ''}">
+        <tr class="${utils.isRecent(code.createdAt) ? 'highlight' : ''}">
           <td><span class="code-text">${code.code}</span></td>
           <td>${statusBadge}</td>
-          <td>
-            ${code.deviceId 
-              ? `<code class="date-text">${code.deviceId}</code>` 
-              : '<span style="color: #999;">-</span>'}
-          </td>
-          <td>
-            ${code.activatedAt 
-              ? `<span class="date-text">${utils.formatDate(code.activatedAt)}</span>` 
-              : '<span style="color: #999;">-</span>'}
-          </td>
-          <td>
-            <span class="date-text">${utils.formatDate(code.createdAt)}</span>
-          </td>
+          <td>${code.deviceId ? `<code class="date-text">${code.deviceId}</code>` : '<span style="color: #999;">-</span>'}</td>
+          <td>${code.activatedAt ? `<span class="date-text">${utils.formatDate(code.activatedAt)}</span>` : '<span style="color: #999;">-</span>'}</td>
+          <td><span class="date-text">${utils.formatDate(code.createdAt)}</span></td>
           <td>
             <div class="action-buttons">
-              <button 
+              <button
                 data-action="delete"
                 data-code="${encodeURIComponent(code.code)}"
                 data-used="${code.used}"
                 data-device-id="${encodeURIComponent(code.deviceId || '')}"
                 class="action-btn delete-btn ${code.used ? 'active-code' : ''}"
-                title="${code.used ? 'حذف الكود المفعل (تحذير)' : 'حذف الكود'}">
+              >
                 🗑️ ${code.used ? 'حذف (مفعل)' : 'حذف'}
               </button>
-              <button 
+              <button
                 data-action="details"
                 data-code="${encodeURIComponent(code.code)}"
                 class="action-btn details-btn"
-                title="عرض التفاصيل">
+              >
                 🔍 تفاصيل
               </button>
             </div>
@@ -292,18 +309,14 @@ const views = {
         </tr>
       `;
     }).join('');
-  },
+  }
 };
 
-// Event Handlers
 const handlers = {
-  /**
-   * Handle login
-   */
   login: async (e) => {
     e.preventDefault();
     const key = elements.adminKey?.value.trim();
-    
+
     if (!key) {
       utils.showAlert('loginAlert', 'الرجاء إدخال كلمة السر', 'danger');
       return;
@@ -315,17 +328,13 @@ const handlers = {
     btn.innerHTML = '<span>⏳ جاري التحقق...</span>';
 
     try {
-      const data = await api.auth.login(key);
-      
+      await api.auth.login(key);
       state.isLoggedIn = true;
       utils.showAlert('mainAlert', '✅ تم تسجيل الدخول بنجاح', 'success', 3000);
-      
+
       views.switch('dashboard');
       await handlers.loadDashboard();
-      
-      // Start auto-refresh
       handlers.startAutoRefresh();
-      
     } catch (error) {
       utils.showAlert('loginAlert', `❌ ${error.message}`, 'danger');
       elements.adminKey.value = '';
@@ -336,9 +345,6 @@ const handlers = {
     }
   },
 
-  /**
-   * Handle logout
-   */
   logout: async () => {
     if (!confirm('هل تريد تسجيل الخروج؟')) return;
 
@@ -347,32 +353,41 @@ const handlers = {
       handlers.stopAutoRefresh();
       state.isLoggedIn = false;
       state.codes = [];
-      
+      state.requests = [];
       views.switch('login');
       utils.showAlert('loginAlert', 'تم تسجيل الخروج بنجاح', 'success', 3000);
-      
     } catch (error) {
       console.error('Logout error:', error);
     }
   },
 
-  /**
-   * Load dashboard data
-   */
+  forceLogout: async () => {
+    try {
+      await api.auth.logout();
+    } catch (error) {
+      console.error('Force logout error:', error);
+    } finally {
+      handlers.stopAutoRefresh();
+      state.isLoggedIn = false;
+      state.codes = [];
+      state.requests = [];
+      views.switch('login');
+      utils.showAlert('loginAlert', 'تم تسجيل الخروج بنجاح', 'success', 3000);
+    }
+  },
+
   loadDashboard: async () => {
     try {
       await Promise.all([
         handlers.loadCodes(),
         handlers.loadStats(),
+        handlers.loadActivationRequests()
       ]);
     } catch (error) {
       utils.showAlert('mainAlert', '❌ خطأ في تحميل البيانات', 'danger');
     }
   },
 
-  /**
-   * Load codes
-   */
   loadCodes: async () => {
     elements.loadingState?.classList.remove('hidden');
     elements.tableContainer?.classList.add('hidden');
@@ -380,35 +395,43 @@ const handlers = {
     try {
       const data = await api.codes.getAll();
       state.codes = data.codes || [];
-      views.renderTable(state.codes);
+      views.renderCodesTable(state.codes);
     } catch (error) {
       utils.showAlert('mainAlert', `❌ خطأ في تحميل الأكواد: ${error.message}`, 'danger');
-      views.renderTable([]);
+      views.renderCodesTable([]);
     }
   },
 
-  /**
-   * Load stats
-   */
+  loadActivationRequests: async () => {
+    elements.requestsLoadingState?.classList.remove('hidden');
+    elements.requestsTableContainer?.classList.add('hidden');
+
+    try {
+      const data = await api.auth.getActivationRequests();
+      state.requests = data.requests || [];
+      views.renderRequestsTable(state.requests);
+    } catch (error) {
+      utils.showAlert('mainAlert', `❌ خطأ في تحميل طلبات التفعيل: ${error.message}`, 'danger');
+      views.renderRequestsTable([]);
+    }
+  },
+
   loadStats: async () => {
     try {
       const data = await api.auth.getStats();
-      state.stats = data.stats;
+      state.stats = data.stats || {};
       views.renderStats(state.stats);
-      
-      // Update DB status
-      const dbStatus = elements.dbStatus;
-      if (dbStatus) {
-        dbStatus.innerHTML = `
+
+      if (elements.dbStatus) {
+        elements.dbStatus.innerHTML = `
           <span class="status-dot active"></span>
           <span>متصل</span>
         `;
       }
     } catch (error) {
       console.error('Stats error:', error);
-      const dbStatus = elements.dbStatus;
-      if (dbStatus) {
-        dbStatus.innerHTML = `
+      if (elements.dbStatus) {
+        elements.dbStatus.innerHTML = `
           <span class="status-dot inactive"></span>
           <span>غير متصل</span>
         `;
@@ -416,9 +439,6 @@ const handlers = {
     }
   },
 
-  /**
-   * Add new code
-   */
   addCode: async (e) => {
     e.preventDefault();
     const code = elements.newCode?.value.trim();
@@ -435,16 +455,12 @@ const handlers = {
 
     try {
       await api.codes.add(code);
-      
       utils.showAlert('mainAlert', `✅ تم إضافة الكود <strong>${code.toUpperCase()}</strong> بنجاح`, 'success', 5000);
-      
       elements.newCode.value = '';
       elements.newCode.focus();
-      
-      await handlers.loadCodes();
-      
+      await Promise.all([handlers.loadCodes(), handlers.loadStats()]);
     } catch (error) {
-      if (error.message.includes('موجود مسبقاً') || error.message.includes('already exists')) {
+      if (error.message.includes('موجود') || error.message.includes('already exists')) {
         utils.showAlert('mainAlert', '⚠️ هذا الكود موجود مسبقاً في النظام', 'warning', 5000);
         elements.newCode.select();
       } else {
@@ -456,19 +472,49 @@ const handlers = {
     }
   },
 
-  /**
-   * Delete code
-   */
+  approveRequest: async (requestId) => {
+    const input = document.querySelector(`.request-code-input[data-request-id="${requestId}"]`);
+    const code = input?.value.trim().toUpperCase();
+
+    if (!code) {
+      utils.showAlert('mainAlert', 'أدخل الكود الذي تريد ربطه بهذا الطلب أولاً', 'warning');
+      input?.focus();
+      return;
+    }
+
+    try {
+      await api.auth.approveRequest(requestId, code);
+      utils.showAlert('mainAlert', `✅ تم ربط الكود <strong>${code}</strong> مع الطلب بنجاح`, 'success', 5000);
+      await Promise.all([
+        handlers.loadActivationRequests(),
+        handlers.loadCodes(),
+        handlers.loadStats()
+      ]);
+    } catch (error) {
+      utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
+    }
+  },
+
+  rejectRequest: async (requestId) => {
+    const reason = prompt('سبب الرفض (اختياري):') || '';
+
+    try {
+      await api.auth.rejectRequest(requestId, reason);
+      utils.showAlert('mainAlert', '✅ تم رفض طلب التفعيل', 'success', 4000);
+      await Promise.all([
+        handlers.loadActivationRequests(),
+        handlers.loadStats()
+      ]);
+    } catch (error) {
+      utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
+    }
+  },
+
   deleteCode: async (code, isUsed = false, deviceId = '') => {
     let message = `هل أنت متأكد من حذف الكود "${code}"؟`;
-    
+
     if (isUsed) {
-      message = `⚠️ تنبيه مهم\n\n` +
-                `هذا الكود مفعل على جهاز بالفعل.\n` +
-                `الكود: ${code}\n` +
-                `الجهاز: ${deviceId || 'غير معروف'}\n\n` +
-                `حذف هذا الكود قد يسبب توقف التفعيل على هذا الجهاز.\n` +
-                `هل تريد المتابعة بالحذف؟`;
+      message = `⚠️ تنبيه مهم\n\nهذا الكود مفعل على جهاز بالفعل.\nالكود: ${code}\nالجهاز: ${deviceId || 'غير معروف'}\n\nحذف هذا الكود قد يسبب توقف التفعيل على هذا الجهاز.\nهل تريد المتابعة بالحذف؟`;
     }
 
     if (!confirm(message)) return;
@@ -476,21 +522,18 @@ const handlers = {
     try {
       const data = await api.codes.delete(code);
       utils.showAlert('mainAlert', `✅ ${data.message}`, 'success', 5000);
-      await handlers.loadCodes();
+      await Promise.all([handlers.loadCodes(), handlers.loadStats()]);
     } catch (error) {
       utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
     }
   },
 
-  /**
-   * Show code details
-   */
   showDetails: async (code) => {
     try {
       const data = await api.codes.getDetails(code);
       const codeData = data.code;
-      
-      const content = `
+
+      elements.detailsContent.innerHTML = `
         <div class="details-grid">
           <p><strong>الكود:</strong> <span class="code-text">${codeData.code}</span></p>
           <p><strong>الحالة:</strong> ${codeData.used ? '🔒 مفعل' : '✅ متاح'}</p>
@@ -499,21 +542,16 @@ const handlers = {
           <p><strong>تاريخ الإنشاء:</strong> ${utils.formatDate(codeData.createdAt)}</p>
         </div>
       `;
-      
-      elements.detailsContent.innerHTML = content;
+
       elements.detailsModal.classList.remove('hidden');
-      
     } catch (error) {
       utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
     }
   },
 
-  /**
-   * Change password
-   */
   changePassword: async (e) => {
     e.preventDefault();
-    
+
     const currentPassword = elements.currentPassword?.value;
     const newPassword = elements.newPassword?.value;
     const confirmPassword = elements.confirmPassword?.value;
@@ -534,19 +572,14 @@ const handlers = {
     btn.innerHTML = '<span>⏳ جاري الحفظ...</span>';
 
     try {
-      await api.auth.changePassword(currentPassword, newPassword);
-      
+      await api.auth.changePassword(currentPassword, newPassword, confirmPassword);
       utils.showAlert('passwordAlert', '✅ تم تغيير كلمة السر بنجاح', 'success');
-      
+
       setTimeout(() => {
         handlers.hidePasswordModal();
         utils.showAlert('mainAlert', '✅ تم تغيير كلمة السر. سجل الدخول مرة أخرى.', 'success', 5000);
-        
-        setTimeout(() => {
-          handlers.logout();
-        }, 2000);
+        setTimeout(() => handlers.forceLogout(), 2000);
       }, 1500);
-      
     } catch (error) {
       utils.showAlert('passwordAlert', `❌ ${error.message}`, 'danger');
     } finally {
@@ -555,9 +588,6 @@ const handlers = {
     }
   },
 
-  /**
-   * Show/hide password modal
-   */
   showPasswordModal: () => {
     elements.passwordModal.classList.remove('hidden');
     elements.currentPassword.value = '';
@@ -570,25 +600,20 @@ const handlers = {
     elements.passwordModal.classList.add('hidden');
   },
 
-  /**
-   * Hide details modal
-   */
   hideDetailsModal: () => {
     elements.detailsModal.classList.add('hidden');
   },
 
-  /**
-   * Start auto-refresh timers
-   */
   startAutoRefresh: () => {
     handlers.stopAutoRefresh();
-    
+
     state.refreshTimer = setInterval(() => {
       if (state.currentView === 'dashboard' && document.visibilityState === 'visible') {
         handlers.loadCodes();
+        handlers.loadActivationRequests();
       }
     }, CONFIG.REFRESH_INTERVAL);
-    
+
     state.statsTimer = setInterval(() => {
       if (state.currentView === 'dashboard') {
         handlers.loadStats();
@@ -596,28 +621,25 @@ const handlers = {
     }, CONFIG.STATS_REFRESH_INTERVAL);
   },
 
-  /**
-   * Stop auto-refresh timers
-   */
   stopAutoRefresh: () => {
     if (state.refreshTimer) {
       clearInterval(state.refreshTimer);
       state.refreshTimer = null;
     }
+
     if (state.statsTimer) {
       clearInterval(state.statsTimer);
       state.statsTimer = null;
     }
-  },
+  }
 };
 
-// Initialization
 const init = () => {
-  // Cache DOM elements
   const elementIds = [
     'loginView', 'dashboardView',
     'loginForm', 'adminKey', 'loginAlert',
     'mainAlert', 'statsGrid', 'headerStats',
+    'requestsLoadingState', 'requestsTableContainer', 'requestsTableBody', 'requestsEmptyState',
     'loadingState', 'codesTableBody', 'tableContainer', 'emptyState',
     'addCodeForm', 'newCode',
     'refreshBtn', 'logoutBtn', 'changePasswordBtn',
@@ -628,23 +650,40 @@ const init = () => {
     'dbStatus'
   ];
 
-  elementIds.forEach(id => {
+  elementIds.forEach((id) => {
     elements[id] = document.getElementById(id);
   });
 
-  // Event listeners
   elements.loginForm?.addEventListener('submit', handlers.login);
   elements.addCodeForm?.addEventListener('submit', handlers.addCode);
   elements.passwordForm?.addEventListener('submit', handlers.changePassword);
-  
+
   elements.logoutBtn?.addEventListener('click', handlers.logout);
-  elements.refreshBtn?.addEventListener('click', handlers.loadCodes);
+  elements.refreshBtn?.addEventListener('click', handlers.loadDashboard);
   elements.changePasswordBtn?.addEventListener('click', handlers.showPasswordModal);
-  
+
   elements.closeModalBtn?.addEventListener('click', handlers.hidePasswordModal);
   elements.cancelPasswordBtn?.addEventListener('click', handlers.hidePasswordModal);
   elements.closeDetailsBtn?.addEventListener('click', handlers.hideDetailsModal);
   elements.closeDetailsFooterBtn?.addEventListener('click', handlers.hideDetailsModal);
+
+  elements.requestsTableBody?.addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-action]');
+    if (!button) return;
+
+    const requestId = button.dataset.requestId;
+    if (!requestId) return;
+
+    if (button.dataset.action === 'approve-request') {
+      handlers.approveRequest(requestId);
+      return;
+    }
+
+    if (button.dataset.action === 'reject-request') {
+      handlers.rejectRequest(requestId);
+    }
+  });
+
   elements.codesTableBody?.addEventListener('click', (e) => {
     const button = e.target.closest('button[data-action]');
     if (!button) return;
@@ -653,9 +692,11 @@ const init = () => {
     if (!code) return;
 
     if (button.dataset.action === 'delete') {
-      const isUsed = button.dataset.used === 'true';
-      const deviceId = decodeURIComponent(button.dataset.deviceId || '');
-      handlers.deleteCode(code, isUsed, deviceId);
+      handlers.deleteCode(
+        code,
+        button.dataset.used === 'true',
+        decodeURIComponent(button.dataset.deviceId || '')
+      );
       return;
     }
 
@@ -664,17 +705,16 @@ const init = () => {
     }
   });
 
-  // Close modals on outside click
   window.addEventListener('click', (e) => {
     if (e.target === elements.passwordModal) {
       handlers.hidePasswordModal();
     }
+
     if (e.target === elements.detailsModal) {
       handlers.hideDetailsModal();
     }
   });
 
-  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       handlers.hidePasswordModal();
@@ -682,10 +722,8 @@ const init = () => {
     }
   });
 
-  // Focus on load
   elements.adminKey?.focus();
 
-  // Check session on load
   api.auth.getStats()
     .then(() => {
       state.isLoggedIn = true;
@@ -694,13 +732,10 @@ const init = () => {
       handlers.startAutoRefresh();
     })
     .catch(() => {
-      // Not logged in, stay on login view
+      // Not logged in.
     });
-
-  console.log('✅ Admin Dashboard initialized');
 };
 
-// Start application when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {

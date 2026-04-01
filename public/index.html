@@ -79,6 +79,33 @@
               <!-- Stats injected by JS -->
             </div>
 
+            <div class="table-section">
+              <h3>طلبات التفعيل الواردة من الأجهزة</h3>
+              <div id="requestsLoadingState" class="loading hidden">جاري تحميل الطلبات...</div>
+              <div class="table-container hidden" id="requestsTableContainer">
+                <table id="requestsTable">
+                  <thead>
+                    <tr>
+                      <th>الجهاز</th>
+                      <th>الحالة</th>
+                      <th>الكود المربوط</th>
+                      <th>تاريخ الطلب</th>
+                      <th>آخر تحديث</th>
+                      <th>الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody id="requestsTableBody">
+                    <!-- Rows injected by JS -->
+                  </tbody>
+                </table>
+              </div>
+              <div id="requestsEmptyState" class="empty-state hidden">
+                <div class="empty-state-icon">📲</div>
+                <h3>لا توجد طلبات تفعيل حالياً</h3>
+                <p>عندما يرسل جهاز طلب تفعيل سيظهر هنا مباشرة</p>
+              </div>
+            </div>
+
             <!-- Add Code Form -->
             <div class="add-code-form">
               <h3>➕ إضافة كود جديد</h3>
