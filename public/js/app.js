@@ -61,6 +61,26 @@ const utils = {
     return (new Date() - created) < CONFIG.HIGHLIGHT_DURATION;
   },
 
+  getDeviceUsageHtml: (request) => {
+    const usage = request.deviceUsage || {};
+    const activationCount = Number(usage.activationCount || 0);
+    const codes = Array.isArray(usage.codes) ? usage.codes.filter(Boolean) : [];
+
+    if (activationCount === 0) {
+      return '<div class="request-note">سجل الجهاز: غير موجود مسبقًا في الأكواد المفعلة.</div>';
+    }
+
+    const codesHtml = codes.length
+      ? codes.map((code) => `<span class="code-text">${code}</span>`).join(' ، ')
+      : 'لا يوجد';
+
+    return `
+      <div class="request-note">
+        سجل الجهاز: موجود <strong>${activationCount}</strong> ${activationCount === 1 ? 'مرة' : 'مرات'}، والأكواد المرتبطة: ${codesHtml}
+      </div>
+    `;
+  },
+
   getRequestStatusBadge: (request) => {
     if (request.status === 'completed') {
       return '<span class="badge badge-success">تم التفعيل</span>';
@@ -213,6 +233,7 @@ const views = {
           <div class="request-device">
             <code class="date-text">${request.deviceId}</code>
             <div class="request-id">ID: ${request._id}</div>
+            ${utils.getDeviceUsageHtml(request)}
           </div>
         </td>
         <td>${utils.getRequestStatusBadge(request)}</td>

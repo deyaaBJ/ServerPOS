@@ -3,6 +3,62 @@ const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 
+const attachDeviceUsageToRequests = async (requests) => {
+  if (!requests.length) {
+    return [];
+  }
+
+  const deviceIds = [...new Set(
+    requests
+      .map((request) => request.deviceId?.trim())
+      .filter(Boolean)
+  )];
+
+  const deviceUsageRows = await ActivationCode.aggregate([
+    {
+      $match: {
+        used: true,
+        deviceId: { $in: deviceIds }
+      }
+    },
+    { $sort: { activatedAt: -1, createdAt: -1 } },
+    {
+      $group: {
+        _id: '$deviceId',
+        activationCount: { $sum: 1 },
+        codes: { $push: '$code' },
+        lastActivatedAt: { $first: '$activatedAt' }
+      }
+    }
+  ]);
+
+  const usageByDeviceId = new Map(
+    deviceUsageRows.map((row) => [
+      row._id,
+      {
+        exists: row.activationCount > 0,
+        activationCount: row.activationCount,
+        codes: row.codes,
+        lastActivatedAt: row.lastActivatedAt || null
+      }
+    ])
+  );
+
+  return requests.map((request) => {
+    const usage = usageByDeviceId.get(request.deviceId) || {
+      exists: false,
+      activationCount: 0,
+      codes: [],
+      lastActivatedAt: null
+    };
+
+    return {
+      ...request.toObject(),
+      deviceUsage: usage
+    };
+  });
+};
+
 // Login
 exports.login = asyncHandler(async (req, res) => {
   const { key } = req.body;
@@ -130,9 +186,11 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(100);
 
+  const requestsWithDeviceUsage = await attachDeviceUsageToRequests(requests);
+
   res.json({
     success: true,
-    requests
+    requests: requestsWithDeviceUsage
   });
 });
 
