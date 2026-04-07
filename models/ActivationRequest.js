@@ -35,6 +35,14 @@ const activationRequestSchema = new mongoose.Schema({
     trim: true,
     maxlength: [250, 'Rejection reason cannot exceed 250 characters']
   },
+  isArchived: {
+    type: Boolean,
+    default: false
+  },
+  archivedAt: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

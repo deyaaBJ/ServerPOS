@@ -5,6 +5,7 @@ const { adminOnly } = require('../middleware/auth');
 const {
   validateLogin,
   validateChangePassword,
+  validateActivationRequestStatus,
   validateApproveActivationRequest,
   validateRejectActivationRequest
 } = require('../middleware/validator');
@@ -24,6 +25,12 @@ router.post(
   adminOnly,
   validateRejectActivationRequest,
   adminController.rejectActivationRequest
+);
+router.delete(
+  '/activation-requests/:requestId',
+  adminOnly,
+  validateActivationRequestStatus,
+  adminController.archiveActivationRequest
 );
 router.post('/logout', adminOnly, adminController.logout);
 

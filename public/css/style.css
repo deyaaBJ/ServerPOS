@@ -43,6 +43,7 @@ body {
   padding: 20px;
   color: var(--color-text);
   line-height: 1.6;
+  overflow-x: hidden;
 }
 
 /* Utilities */
@@ -63,21 +64,21 @@ body {
   to { transform: rotate(360deg); }
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
-}
-
 @keyframes highlightRow {
   0% { background: rgba(106, 17, 203, 0.1); }
   100% { background: transparent; }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* Layout */
 .container {
   max-width: 1400px;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 .card {
@@ -118,6 +119,7 @@ body {
 /* Content */
 .content {
   padding: 40px;
+  overflow-x: hidden;
 }
 
 /* Forms */
@@ -747,6 +749,23 @@ tr.highlight {
   table {
     min-width: 700px;
   }
+
+  /* إخفاء الجداول وإظهار الكروت */
+  #requestsTableContainer {
+    display: none !important;
+  }
+
+  #tableContainer {
+    display: none !important;
+  }
+
+  .requests-cards {
+    display: grid !important;
+  }
+
+  .codes-cards {
+    display: grid !important;
+  }
 }
 
 @media (max-width: 480px) {
@@ -787,5 +806,399 @@ tr.highlight {
   .request-code-input {
     max-width: none;
     min-width: auto;
+  }
+}
+
+.muted-text {
+  color: #999;
+}
+
+.requests-cards {
+  display: none;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+/* === Request Cards (Mobile) === */
+.request-card {
+  background: white;
+  border: 0.5px solid var(--color-border, #e8edf5);
+  border-radius: 20px;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.request-card-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 0.5px solid #eef2f7;
+  flex-wrap: wrap;
+}
+
+.request-card-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.request-card-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.request-card-device {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2d3d;
+  background-color: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+  white-space: normal;
+  line-height: 1.4;
+  margin-top: 4px;
+  direction: ltr;
+  text-align: left;
+}
+
+.request-card-meta {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.request-card-meta span {
+  background: #f4f7fb;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 10px;
+  color: #5a6e8a;
+}
+
+.request-card-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* إخفاء الكبسات المباشرة في الكروت */
+.request-card-top-actions .request-actions {
+  display: none;
+}
+
+.request-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fcfdff;
+  border-bottom: 0.5px solid #eef2f7;
+}
+
+.request-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.request-card-row span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.request-card-row strong {
+  font-size: 12px;
+  color: #1f2d3d;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+  text-align: left;
+  flex: 1;
+}
+
+.request-card-footer {
+  padding: 12px 16px 16px;
+  display: flex;
+  gap: 12px;
+}
+
+.request-details-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 14px;
+  background: var(--primary-gradient);
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+/* === Code Cards (Mobile) === */
+.code-card {
+  background: white;
+  border: 0.5px solid #e8edf5;
+  border-radius: 20px;
+  overflow: hidden;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.code-card-header {
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 0.5px solid #eef2f7;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.code-card-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.code-card-value {
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2d3d;
+}
+
+.code-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fcfdff;
+  border-bottom: 0.5px solid #eef2f7;
+}
+
+.code-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.code-card-row span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.code-card-row strong {
+  font-size: 12px;
+  color: #1f2d3d;
+  font-weight: 600;
+}
+
+.code-card-device-id {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  background-color: #f8f9fa;
+  padding: 6px 10px;
+  border-radius: 10px;
+  word-break: break-all;
+  white-space: normal;
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+  direction: ltr;
+  text-align: left;
+}
+
+.code-card-footer {
+  padding: 12px 16px 16px;
+  display: flex;
+  gap: 12px;
+}
+
+.code-card-footer .action-btn {
+  flex: 1;
+  justify-content: center;
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 14px;
+}
+
+/* === Menu Trigger (القائمة المنبثقة) === */
+.request-menu-trigger {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: #4a5568;
+}
+
+.request-menu-trigger:active {
+  background: #f1f5f9;
+  transform: scale(0.95);
+}
+
+/* القائمة المنبثقة */
+.request-menu-list {
+  position: absolute;
+  left: 0;
+  top: 45px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  min-width: 160px;
+  z-index: 1000;
+  overflow: hidden;
+  display: none;
+  border: 1px solid #eef2f6;
+}
+
+.request-menu.open .request-menu-list {
+  display: block;
+  animation: fadeInDown 0.2s ease;
+}
+
+/* عناصر القائمة */
+.request-menu-item {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  text-align: right;
+  border: none;
+  background: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+.request-menu-item:active {
+  background: #f8fafc;
+}
+
+.request-menu-item.danger {
+  color: #e03131;
+  border-top: 1px solid #f1f3f5;
+}
+
+.request-menu-item.danger:active {
+  background: #fff5f5;
+}
+
+/* في المودال الأزرار تظهر طبيعية */
+.modal-footer-stack .request-actions {
+  display: flex !important;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.request-id-inline {
+  font-family: 'Courier New', monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.request-details-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.request-details-grid .request-note {
+  margin-top: 0;
+}
+
+.codes-cards {
+  display: none;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.modal-footer-stack {
+  border-top: 1px solid #eef2f7;
+  justify-content: stretch;
+  flex-wrap: wrap;
+}
+
+.modal-footer-stack .request-actions {
+  width: 100%;
+}
+
+.modal-footer-stack .action-btn,
+.modal-footer-stack .request-code-input {
+  width: 100%;
+}
+
+/* للشاشات الصغيرة جداً */
+@media (max-width: 400px) {
+  .request-card-header,
+  .code-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .request-card-top-actions {
+    align-self: flex-end;
+  }
+
+  .request-card-row,
+  .code-card-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .request-card-row strong,
+  .code-card-row strong {
+    text-align: right;
+    width: 100%;
+  }
+
+  .request-menu-list {
+    min-width: 140px;
+    left: -10px;
+  }
+  
+  .request-menu-item {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+}
+
+/* للشاشات الكبيرة */
+@media (min-width: 769px) {
+  .requests-cards {
+    display: none !important;
+  }
+
+  .codes-cards {
+    display: none !important;
   }
 }

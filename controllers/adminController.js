@@ -182,7 +182,7 @@ exports.getStats = asyncHandler(async (req, res) => {
 });
 
 exports.getActivationRequests = asyncHandler(async (req, res) => {
-  const requests = await ActivationRequest.find()
+  const requests = await ActivationRequest.find({ isArchived: { $ne: true } })
     .sort({ createdAt: -1 })
     .limit(100);
 
@@ -258,6 +258,36 @@ exports.rejectActivationRequest = asyncHandler(async (req, res) => {
     success: true,
     message: 'Activation request rejected successfully',
     request
+  });
+});
+
+exports.archiveActivationRequest = asyncHandler(async (req, res) => {
+  const { requestId } = req.params;
+
+  const request = await ActivationRequest.findById(requestId);
+
+  if (!request) {
+    throw new AppError('Activation request not found', 404);
+  }
+
+  if (request.status === 'pending') {
+    throw new AppError('Pending activation requests cannot be removed', 400);
+  }
+
+  if (request.isArchived) {
+    return res.json({
+      success: true,
+      message: 'Activation request already removed from dashboard'
+    });
+  }
+
+  request.isArchived = true;
+  request.archivedAt = new Date();
+  await request.save();
+
+  res.json({
+    success: true,
+    message: 'Activation request removed from dashboard successfully'
   });
 });
 
