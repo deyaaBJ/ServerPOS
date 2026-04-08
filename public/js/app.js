@@ -552,8 +552,10 @@ const handlers = {
     }
   },
 
-  approveRequest: async (requestId) => {
-    const input = document.querySelector(`.request-code-input[data-request-id="${requestId}"]`);
+  approveRequest: async (requestId, sourceButton = null) => {
+    const scopedInput = sourceButton?.closest('.request-actions, .modal-request-actions, .request-details-modal, .modal-content')
+      ?.querySelector(`.request-code-input[data-request-id="${requestId}"]`);
+    const input = scopedInput || document.querySelector(`.request-code-input[data-request-id="${requestId}"]`);
     const code = input?.value.trim().toUpperCase();
 
     if (!code) {
@@ -572,7 +574,13 @@ const handlers = {
   },
 
   rejectRequest: async (requestId) => {
-    const reason = prompt('سبب الرفض (اختياري):') || '';
+    const reasonInput = prompt('سبب الرفض (اختياري):');
+
+    if (reasonInput === null) {
+      return;
+    }
+
+    const reason = reasonInput.trim();
 
     try {
       await api.auth.rejectRequest(requestId, reason);
@@ -733,7 +741,7 @@ const handlers = {
 
     handlers.closeRequestMenus();
 
-    if (action === 'approve-request') return handlers.approveRequest(requestId);
+    if (action === 'approve-request') return handlers.approveRequest(requestId, button);
     if (action === 'reject-request') return handlers.rejectRequest(requestId);
     if (action === 'delete-request') return handlers.deleteRequest(requestId);
     if (action === 'show-request-details') return handlers.showRequestDetails(requestId);
