@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeCode } = require('../utils/code');
 
 const activationCodeSchema = new mongoose.Schema({
   code: { 
@@ -57,7 +58,7 @@ activationCodeSchema.methods.isAvailable = function() {
 
 // Static method to find by code (case insensitive)
 activationCodeSchema.statics.findByCode = function(code) {
-  return this.findOne({ code: code.toUpperCase().trim() }).sort({ createdAt: -1 });
+  return this.findOne({ code: normalizeCode(code) }).sort({ createdAt: -1 });
 };
 
 module.exports = mongoose.model('ActivationCode', activationCodeSchema);

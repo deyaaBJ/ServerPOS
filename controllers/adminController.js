@@ -2,8 +2,7 @@ const Admin = require('../models/Admin');
 const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-
-const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+const { normalizeCode } = require('../utils/code');
 
 const attachDeviceUsageToRequests = async (requests) => {
   if (!requests.length) {

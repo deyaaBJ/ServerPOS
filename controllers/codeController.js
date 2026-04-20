@@ -1,5 +1,6 @@
 const ActivationCode = require('../models/ActivationCode');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
+const { normalizeCode } = require('../utils/code');
 
 // Get all codes
 exports.getAllCodes = asyncHandler(async (req, res) => {
@@ -17,7 +18,7 @@ exports.getAllCodes = asyncHandler(async (req, res) => {
 // Add new code
 exports.addCode = asyncHandler(async (req, res) => {
   const { code } = req.body;
-  const normalizedCode = code.toUpperCase().trim();
+  const normalizedCode = normalizeCode(code);
 
   // Check if code exists (case insensitive)
   const existingCode = await ActivationCode.findByCode(normalizedCode);
@@ -40,7 +41,7 @@ exports.addCode = asyncHandler(async (req, res) => {
 // Delete code (even if used)
 exports.deleteCode = asyncHandler(async (req, res) => {
   const { code } = req.params;
-  const normalizedCode = code.toUpperCase().trim();
+  const normalizedCode = normalizeCode(code);
 
   const codeEntry = await ActivationCode.findByCode(normalizedCode);
   
@@ -69,7 +70,7 @@ exports.deleteCode = asyncHandler(async (req, res) => {
 // Get single code details
 exports.getCodeDetails = asyncHandler(async (req, res) => {
   const { code } = req.params;
-  const normalizedCode = code.toUpperCase().trim();
+  const normalizedCode = normalizeCode(code);
 
   const codeEntry = await ActivationCode.findByCode(normalizedCode);
   

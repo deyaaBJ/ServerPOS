@@ -1,4 +1,5 @@
 const { body, param, query, validationResult } = require('express-validator');
+const { CODE_PATTERN, normalizeCode } = require('../utils/code');
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -28,7 +29,8 @@ const validateAddCode = [
     .trim()
     .notEmpty().withMessage('Code is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .customSanitizer(value => value.toUpperCase()),
+    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .customSanitizer(normalizeCode),
   handleValidationErrors
 ];
 
@@ -61,7 +63,9 @@ const validateActivation = [
   body('code')
     .trim()
     .notEmpty().withMessage('Code is required')
-    .customSanitizer(value => value.toUpperCase()),
+    .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
+    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .customSanitizer(normalizeCode),
   body('deviceId')
     .trim()
     .notEmpty().withMessage('Device ID is required')
@@ -98,7 +102,8 @@ const validateApproveActivationRequest = [
     .trim()
     .notEmpty().withMessage('Code is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .customSanitizer(value => value.toUpperCase()),
+    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .customSanitizer(normalizeCode),
   handleValidationErrors
 ];
 
@@ -117,7 +122,10 @@ const validateRejectActivationRequest = [
 const validateDeleteCode = [
   param('code')
     .trim()
-    .notEmpty().withMessage('Code parameter is required'),
+    .notEmpty().withMessage('Code parameter is required')
+    .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
+    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .customSanitizer(normalizeCode),
   handleValidationErrors
 ];
 
