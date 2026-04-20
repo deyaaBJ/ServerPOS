@@ -1,5 +1,5 @@
 const { body, param, query, validationResult } = require('express-validator');
-const { CODE_PATTERN, normalizeCode } = require('../utils/code');
+const { DAY_CODE_PATTERN, normalizeCode } = require('../utils/code');
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -29,7 +29,16 @@ const validateAddCode = [
     .trim()
     .notEmpty().withMessage('Code is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .custom((value) => {
+      const normalizedCode = normalizeCode(value);
+      const dayMatch = normalizedCode.match(DAY_CODE_PATTERN);
+
+      if (dayMatch && Number.parseInt(dayMatch[1], 10) <= 0) {
+        throw new Error('DAY code must contain a number greater than 0');
+      }
+
+      return true;
+    })
     .customSanitizer(normalizeCode),
   handleValidationErrors
 ];
@@ -64,7 +73,16 @@ const validateActivation = [
     .trim()
     .notEmpty().withMessage('Code is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .custom((value) => {
+      const normalizedCode = normalizeCode(value);
+      const dayMatch = normalizedCode.match(DAY_CODE_PATTERN);
+
+      if (dayMatch && Number.parseInt(dayMatch[1], 10) <= 0) {
+        throw new Error('DAY code must contain a number greater than 0');
+      }
+
+      return true;
+    })
     .customSanitizer(normalizeCode),
   body('deviceId')
     .trim()
@@ -102,7 +120,16 @@ const validateApproveActivationRequest = [
     .trim()
     .notEmpty().withMessage('Code is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
+    .custom((value) => {
+      const normalizedCode = normalizeCode(value);
+      const dayMatch = normalizedCode.match(DAY_CODE_PATTERN);
+
+      if (dayMatch && Number.parseInt(dayMatch[1], 10) <= 0) {
+        throw new Error('DAY code must contain a number greater than 0');
+      }
+
+      return true;
+    })
     .customSanitizer(normalizeCode),
   handleValidationErrors
 ];
@@ -124,7 +151,6 @@ const validateDeleteCode = [
     .trim()
     .notEmpty().withMessage('Code parameter is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .matches(CODE_PATTERN).withMessage('Code can contain only letters, numbers, "-" and "_"')
     .customSanitizer(normalizeCode),
   handleValidationErrors
 ];

@@ -1,7 +1,37 @@
 const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-const { normalizeCode } = require('../utils/code');
+const { isCodeExpired, normalizeCode } = require('../utils/code');
+
+const refreshExpiredRequestState = async (request) => {
+  if (!request?.assignedCode || !request?.completedAt) {
+    return request;
+  }
+
+  if (!isCodeExpired(request.assignedCode, request.completedAt)) {
+    return request;
+  }
+
+  await ActivationCode.updateMany(
+    {
+      requestId: request._id,
+      code: normalizeCode(request.assignedCode),
+      used: true
+    },
+    {
+      $set: {
+        used: false
+      }
+    }
+  );
+
+  request.status = 'pending';
+  request.completedAt = null;
+  request.approvedAt = null;
+  await request.save();
+
+  return request;
+};
 
 exports.createRequest = asyncHandler(async (req, res) => {
   const normalizedDeviceId = req.body.deviceId.trim();
@@ -51,6 +81,8 @@ exports.getRequestStatus = asyncHandler(async (req, res) => {
     throw new AppError('Activation request not found', 404);
   }
 
+  await refreshExpiredRequestState(request);
+
   if (deviceId && request.deviceId !== deviceId) {
     throw new AppError('This request does not belong to this device', 403);
   }
@@ -80,6 +112,8 @@ exports.activate = asyncHandler(async (req, res) => {
   if (!activationRequest) {
     throw new AppError('Activation request not found', 404);
   }
+
+  await refreshExpiredRequestState(activationRequest);
 
   if (activationRequest.deviceId !== normalizedDeviceId) {
     throw new AppError('This activation request belongs to another device', 403);

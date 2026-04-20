@@ -2,7 +2,37 @@ const Admin = require('../models/Admin');
 const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-const { normalizeCode } = require('../utils/code');
+const { isCodeExpired, normalizeCode } = require('../utils/code');
+
+const refreshExpiredRequestState = async (request) => {
+  if (!request?.assignedCode || !request?.completedAt) {
+    return request;
+  }
+
+  if (!isCodeExpired(request.assignedCode, request.completedAt)) {
+    return request;
+  }
+
+  await ActivationCode.updateMany(
+    {
+      requestId: request._id,
+      code: normalizeCode(request.assignedCode),
+      used: true
+    },
+    {
+      $set: {
+        used: false
+      }
+    }
+  );
+
+  request.status = 'pending';
+  request.completedAt = null;
+  request.approvedAt = null;
+  await request.save();
+
+  return request;
+};
 
 const attachDeviceUsageToRequests = async (requests) => {
   if (!requests.length) {
@@ -187,7 +217,11 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(100);
 
-  const requestsWithDeviceUsage = await attachDeviceUsageToRequests(requests);
+  const refreshedRequests = await Promise.all(
+    requests.map((request) => refreshExpiredRequestState(request))
+  );
+
+  const requestsWithDeviceUsage = await attachDeviceUsageToRequests(refreshedRequests);
 
   res.json({
     success: true,
@@ -203,6 +237,8 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
   if (!request) {
     throw new AppError('Activation request not found', 404);
   }
+
+  await refreshExpiredRequestState(request);
 
   if (request.status === 'completed') {
     throw new AppError('Activation request is already completed', 400);
