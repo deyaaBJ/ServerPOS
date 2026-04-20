@@ -4,11 +4,16 @@ const activationCodeSchema = new mongoose.Schema({
   code: { 
     type: String, 
     required: [true, 'Code is required'],
-    unique: true,
     uppercase: true,
     trim: true,
     minlength: [3, 'Code must be at least 3 characters'],
     maxlength: [50, 'Code cannot exceed 50 characters']
+  },
+  requestId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ActivationRequest',
+    default: null,
+    index: true
   },
   used: { 
     type: Boolean, 
@@ -38,6 +43,7 @@ const activationCodeSchema = new mongoose.Schema({
 // Indexes for performance
 activationCodeSchema.index({ code: 1, used: 1 });
 activationCodeSchema.index({ deviceId: 1, used: 1 });
+activationCodeSchema.index({ requestId: 1, deviceId: 1 });
 
 // Virtual for status text
 activationCodeSchema.virtual('statusText').get(function() {
@@ -51,7 +57,7 @@ activationCodeSchema.methods.isAvailable = function() {
 
 // Static method to find by code (case insensitive)
 activationCodeSchema.statics.findByCode = function(code) {
-  return this.findOne({ code: code.toUpperCase().trim() });
+  return this.findOne({ code: code.toUpperCase().trim() }).sort({ createdAt: -1 });
 };
 
 module.exports = mongoose.model('ActivationCode', activationCodeSchema);

@@ -94,7 +94,7 @@ const utils = {
 
   getRequestStatusBadge: (request) => {
     if (request.status === 'completed') return '<span class="badge badge-success">تم التفعيل</span>';
-    if (request.status === 'approved') return '<span class="badge badge-warning">بانتظار إدخال الكود</span>';
+    if (request.status === 'approved') return '<span class="badge badge-warning">تم ربط الكود</span>';
     if (request.status === 'rejected') return '<span class="badge badge-danger">مرفوض</span>';
     return '<span class="badge badge-primary">معلق</span>';
   },
@@ -106,7 +106,7 @@ const utils = {
       notes.push(`<div class="request-note">سبب الرفض: ${utils.escapeHtml(request.rejectionReason)}</div>`);
     }
 
-    if (request.status === 'approved') {
+    if (request.status === 'approved' || request.status === 'completed') {
       notes.push('<div class="request-note">حذف الطلب من لوحة الأدمن سيخفيه فقط من الإدارة ولن يلغي الكود المربوط أو يوقف التفعيل.</div>');
     }
 
@@ -122,7 +122,7 @@ const utils = {
           type="text"
           class="form-control request-code-input"
           data-request-id="${request._id}"
-          placeholder="أدخل كود للربط"
+          placeholder="أدخل أي كود للتفعيل"
           value="${utils.escapeHtml(request.assignedCode || '')}"
         />
       `
@@ -131,7 +131,7 @@ const utils = {
     if (compact) {
       return `
         <div class="request-menu-list">
-          ${request.status !== 'completed' ? `<button class="request-menu-item" data-action="approve-request" data-request-id="${request._id}">ربط الكود</button><button class="request-menu-item" data-action="reject-request" data-request-id="${request._id}">رفض</button>` : ''}
+          ${request.status !== 'completed' ? `<button class="request-menu-item" data-action="approve-request" data-request-id="${request._id}">اعتماد الكود</button><button class="request-menu-item" data-action="reject-request" data-request-id="${request._id}">رفض</button>` : ''}
           ${utils.canArchiveRequest(request) ? `<button class="request-menu-item danger" data-action="delete-request" data-request-id="${request._id}">حذف الطلب</button>` : ''}
         </div>
       `;
@@ -140,7 +140,7 @@ const utils = {
     return `
       <div class="request-actions">
         ${inputHtml}
-        <button class="action-btn approve-btn" data-action="approve-request" data-request-id="${request._id}" ${disabled}>ربط الكود</button>
+        <button class="action-btn approve-btn" data-action="approve-request" data-request-id="${request._id}" ${disabled}>اعتماد الكود</button>
         <button class="action-btn reject-btn" data-action="reject-request" data-request-id="${request._id}" ${disabled}>رفض</button>
         ${utils.canArchiveRequest(request) ? `<button class="action-btn delete-btn" data-action="delete-request" data-request-id="${request._id}">حذف الطلب</button>` : ''}
       </div>
@@ -331,77 +331,6 @@ const views = {
 `).join('');
   },
 
-  renderCodesTable: (codes) => {
-    const tbody = elements.codesTableBody;
-    const cardsContainer = elements.codesCardsContainer;
-    const loadingEl = elements.loadingState;
-    const tableContainer = elements.tableContainer;
-    const emptyState = elements.emptyState;
-
-    loadingEl?.classList.add('hidden');
-
-    if (!codes || codes.length === 0) {
-      tableContainer?.classList.add('hidden');
-      cardsContainer?.classList.add('hidden');
-      emptyState?.classList.remove('hidden');
-      return;
-    }
-
-    tableContainer?.classList.remove('hidden');
-    cardsContainer?.classList.remove('hidden');
-    emptyState?.classList.add('hidden');
-
-    tbody.innerHTML = codes.map((code) => {
-      const statusBadge = utils.getCodeStatusBadge(code);
-
-      return `
-        <tr class="${utils.isRecent(code.createdAt) ? 'highlight' : ''}">
-          <td><span class="code-text">${utils.escapeHtml(code.code)}</span></td>
-          <td>${statusBadge}</td>
-          <td>${code.deviceId ? `<code class="date-text">${utils.escapeHtml(code.deviceId)}</code>` : '<span class="muted-text">-</span>'}</td>
-          <td>${code.activatedAt ? `<span class="date-text">${utils.formatDate(code.activatedAt)}</span>` : '<span class="muted-text">-</span>'}</td>
-          <td><span class="date-text">${utils.formatDate(code.createdAt)}</span></td>
-          <td>
-            <div class="action-buttons">
-              <button data-action="delete" data-code="${encodeURIComponent(code.code)}" data-used="${code.used}" data-device-id="${encodeURIComponent(code.deviceId || '')}" class="action-btn delete-btn ${code.used ? 'active-code' : ''}">${code.used ? 'حذف (مفعل)' : 'حذف'}</button>
-              <button data-action="details" data-code="${encodeURIComponent(code.code)}" class="action-btn details-btn">تفاصيل</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-   cardsContainer.innerHTML = codes.map((code) => `
-  <article class="code-card ${utils.isRecent(code.createdAt) ? 'highlight' : ''}">
-    <div class="code-card-header">
-      <div>
-        <div class="code-card-label">الكود</div>
-        <div class="code-card-value">${utils.escapeHtml(code.code)}</div>
-      </div>
-      ${utils.getCodeStatusBadge(code)}
-    </div>
-    <div class="code-card-body">
-      <div class="code-card-row">
-        <span>الجهاز</span>
-        <strong class="code-card-device-id">${utils.escapeHtml(code.deviceId || '—')}</strong>
-      </div>
-      <div class="code-card-row">
-        <span>الإنشاء</span>
-        <strong>${utils.formatDate(code.createdAt)}</strong>
-      </div>
-    </div>
-    <div class="code-card-footer">
-      <button data-action="delete" data-code="${encodeURIComponent(code.code)}"
-        data-used="${code.used}" data-device-id="${encodeURIComponent(code.deviceId || '')}"
-        class="action-btn delete-btn ${code.used ? 'active-code' : ''}">
-        ${code.used ? 'حذف (مفعل)' : 'حذف'}
-      </button>
-      <button data-action="details" data-code="${encodeURIComponent(code.code)}"
-        class="action-btn details-btn">تفاصيل</button>
-    </div>
-  </article>
-`).join('');
-  },
 };
 
 const handlers = {
@@ -468,23 +397,9 @@ const handlers = {
 
   loadDashboard: async () => {
     try {
-      await Promise.all([handlers.loadCodes(), handlers.loadStats(), handlers.loadActivationRequests()]);
+      await Promise.all([handlers.loadStats(), handlers.loadActivationRequests()]);
     } catch (error) {
       utils.showAlert('mainAlert', '❌ خطأ في تحميل البيانات', 'danger');
-    }
-  },
-
-  loadCodes: async () => {
-    elements.loadingState?.classList.remove('hidden');
-    elements.tableContainer?.classList.add('hidden');
-
-    try {
-      const data = await api.codes.getAll();
-      state.codes = data.codes || [];
-      views.renderCodesTable(state.codes);
-    } catch (error) {
-      utils.showAlert('mainAlert', `❌ خطأ في تحميل الأكواد: ${error.message}`, 'danger');
-      views.renderCodesTable([]);
     }
   },
 
@@ -519,55 +434,25 @@ const handlers = {
     }
   },
 
-  addCode: async (e) => {
-    e.preventDefault();
-    const code = elements.newCode?.value.trim();
-
-    if (!code || code.length < 3) {
-      utils.showAlert('mainAlert', 'الكود يجب أن يكون 3 أحرف على الأقل', 'danger');
-      return;
-    }
-
-    const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span>جار الإضافة...</span>';
-
-    try {
-      await api.codes.add(code);
-      utils.showAlert('mainAlert', `تمت إضافة الكود <strong>${utils.escapeHtml(code.toUpperCase())}</strong> بنجاح`, 'success', 5000);
-      elements.newCode.value = '';
-      elements.newCode.focus();
-      await Promise.all([handlers.loadCodes(), handlers.loadStats()]);
-    } catch (error) {
-      if (error.message.includes('already exists') || error.message.includes('موجود')) {
-        utils.showAlert('mainAlert', 'هذا الكود موجود مسبقًا في النظام', 'warning', 5000);
-        elements.newCode.select();
-      } else {
-        utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
-      }
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalText;
-    }
-  },
-
   approveRequest: async (requestId, sourceButton = null) => {
     const scopedInput = sourceButton?.closest('.request-actions, .modal-request-actions, .request-details-modal, .modal-content')
       ?.querySelector(`.request-code-input[data-request-id="${requestId}"]`);
     const input = scopedInput || document.querySelector(`.request-code-input[data-request-id="${requestId}"]`);
-    const code = input?.value.trim().toUpperCase();
+    const typedCode = input?.value.trim();
+    const promptedCode = !typedCode ? prompt('أدخل الكود الذي تريد اعتماده لهذا الطلب:') : '';
+    const code = (typedCode || promptedCode || '').trim().toUpperCase();
 
     if (!code) {
-      utils.showAlert('mainAlert', 'أدخل الكود الذي تريد ربطه بهذا الطلب أولًا', 'warning');
+      utils.showAlert('mainAlert', 'أدخل الكود أولًا ثم اعتمد الطلب', 'warning');
       input?.focus();
       return;
     }
 
     try {
-      await api.auth.approveRequest(requestId, code);
-      utils.showAlert('mainAlert', `تم ربط الكود <strong>${utils.escapeHtml(code)}</strong> مع الطلب بنجاح`, 'success', 5000);
-      await Promise.all([handlers.loadActivationRequests(), handlers.loadCodes(), handlers.loadStats()]);
+      const data = await api.auth.approveRequest(requestId, code);
+      const activatedCode = data?.request?.assignedCode || code;
+      utils.showAlert('mainAlert', `تم اعتماد الطلب بالكود <strong>${utils.escapeHtml(activatedCode)}</strong> بنجاح`, 'success', 5000);
+      await Promise.all([handlers.loadActivationRequests(), handlers.loadStats()]);
     } catch (error) {
       utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
     }
@@ -600,7 +485,7 @@ const handlers = {
       return;
     }
 
-    const message = request.status === 'approved'
+    const message = request.status === 'approved' || request.status === 'completed'
       ? 'سيتم إخفاء الطلب من لوحة الأدمن فقط، ولن يتم إلغاء التفعيل أو الربط الحالي. هل تريد المتابعة؟'
       : 'سيتم حذف الطلب من لوحة الأدمن فقط. هل تريد المتابعة؟';
 
@@ -611,45 +496,6 @@ const handlers = {
       handlers.hideRequestDetailsModal();
       utils.showAlert('mainAlert', 'تم حذف الطلب من لوحة الأدمن', 'success', 4000);
       await Promise.all([handlers.loadActivationRequests(), handlers.loadStats()]);
-    } catch (error) {
-      utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
-    }
-  },
-
-  deleteCode: async (code, isUsed = false, deviceId = '') => {
-    let message = `هل أنت متأكد من حذف الكود "${code}"؟`;
-
-    if (isUsed) {
-      message = `تنبيه مهم\n\nهذا الكود مفعل على جهاز بالفعل.\nالكود: ${code}\nالجهاز: ${deviceId || 'غير معروف'}\n\nحذف هذا الكود قد يسبب توقف التفعيل على هذا الجهاز.\nهل تريد المتابعة بالحذف؟`;
-    }
-
-    if (!confirm(message)) return;
-
-    try {
-      const data = await api.codes.delete(code);
-      utils.showAlert('mainAlert', `✅ ${data.message}`, 'success', 5000);
-      await Promise.all([handlers.loadCodes(), handlers.loadStats()]);
-    } catch (error) {
-      utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
-    }
-  },
-
-  showDetails: async (code) => {
-    try {
-      const data = await api.codes.getDetails(code);
-      const codeData = data.code;
-
-      elements.detailsContent.innerHTML = `
-        <div class="details-grid">
-          <p><strong>الكود:</strong> <span class="code-text">${utils.escapeHtml(codeData.code)}</span></p>
-          <p><strong>الحالة:</strong> ${codeData.used ? '🔒 مفعل' : '✅ متاح'}</p>
-          <p><strong>رقم الجهاز:</strong> ${utils.escapeHtml(codeData.deviceId || '-')}</p>
-          <p><strong>تاريخ التفعيل:</strong> ${utils.formatDate(codeData.activatedAt)}</p>
-          <p><strong>تاريخ الإنشاء:</strong> ${utils.formatDate(codeData.createdAt)}</p>
-        </div>
-      `;
-
-      elements.detailsModal.classList.remove('hidden');
     } catch (error) {
       utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
     }
@@ -752,7 +598,6 @@ const handlers = {
 
     state.refreshTimer = setInterval(() => {
       if (state.currentView === 'dashboard' && document.visibilityState === 'visible') {
-        handlers.loadCodes();
         handlers.loadActivationRequests();
       }
     }, CONFIG.REFRESH_INTERVAL);
@@ -778,8 +623,6 @@ const init = () => {
     'loginForm', 'adminKey', 'loginAlert',
     'mainAlert', 'statsGrid', 'headerStats',
     'requestsLoadingState', 'requestsTableContainer', 'requestsTableBody', 'requestsCardsContainer', 'requestsEmptyState',
-    'loadingState', 'codesTableBody', 'codesCardsContainer', 'tableContainer', 'emptyState',
-    'addCodeForm', 'newCode',
     'refreshBtn', 'logoutBtn', 'changePasswordBtn',
     'passwordModal', 'passwordForm', 'passwordAlert',
     'currentPassword', 'newPassword', 'confirmPassword',
@@ -794,7 +637,6 @@ const init = () => {
   });
 
   elements.loginForm?.addEventListener('submit', handlers.login);
-  elements.addCodeForm?.addEventListener('submit', handlers.addCode);
   elements.passwordForm?.addEventListener('submit', handlers.changePassword);
 
   elements.logoutBtn?.addEventListener('click', handlers.logout);
@@ -803,8 +645,6 @@ const init = () => {
 
   elements.closeModalBtn?.addEventListener('click', handlers.hidePasswordModal);
   elements.cancelPasswordBtn?.addEventListener('click', handlers.hidePasswordModal);
-  elements.closeDetailsBtn?.addEventListener('click', handlers.hideDetailsModal);
-  elements.closeDetailsFooterBtn?.addEventListener('click', handlers.hideDetailsModal);
   elements.closeRequestDetailsBtn?.addEventListener('click', handlers.hideRequestDetailsModal);
   elements.closeRequestDetailsFooterBtn?.addEventListener('click', handlers.hideRequestDetailsModal);
 
@@ -823,43 +663,8 @@ const init = () => {
     if (button) handlers.handleRequestAction(button);
   });
 
-  elements.codesTableBody?.addEventListener('click', (e) => {
-    const button = e.target.closest('button[data-action]');
-    if (!button) return;
-
-    const code = decodeURIComponent(button.dataset.code || '');
-    if (!code) return;
-
-    if (button.dataset.action === 'delete') {
-      handlers.deleteCode(code, button.dataset.used === 'true', decodeURIComponent(button.dataset.deviceId || ''));
-      return;
-    }
-
-    if (button.dataset.action === 'details') {
-      handlers.showDetails(code);
-    }
-  });
-
-  elements.codesCardsContainer?.addEventListener('click', (e) => {
-    const button = e.target.closest('button[data-action]');
-    if (!button) return;
-
-    const code = decodeURIComponent(button.dataset.code || '');
-    if (!code) return;
-
-    if (button.dataset.action === 'delete') {
-      handlers.deleteCode(code, button.dataset.used === 'true', decodeURIComponent(button.dataset.deviceId || ''));
-      return;
-    }
-
-    if (button.dataset.action === 'details') {
-      handlers.showDetails(code);
-    }
-  });
-
   window.addEventListener('click', (e) => {
     if (e.target === elements.passwordModal) handlers.hidePasswordModal();
-    if (e.target === elements.detailsModal) handlers.hideDetailsModal();
     if (e.target === elements.requestDetailsModal) handlers.hideRequestDetailsModal();
     if (!e.target.closest('.request-menu')) handlers.closeRequestMenus();
   });
@@ -867,7 +672,6 @@ const init = () => {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       handlers.hidePasswordModal();
-      handlers.hideDetailsModal();
       handlers.hideRequestDetailsModal();
       handlers.closeRequestMenus();
     }

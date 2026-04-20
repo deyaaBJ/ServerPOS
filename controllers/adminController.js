@@ -196,12 +196,8 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
 
 exports.approveActivationRequest = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
-  const normalizedCode = req.body.code.toUpperCase().trim();
-
-  const [request, codeEntry] = await Promise.all([
-    ActivationRequest.findById(requestId),
-    ActivationCode.findByCode(normalizedCode)
-  ]);
+  const normalizedCode = req.body.code.trim().toUpperCase();
+  const request = await ActivationRequest.findById(requestId);
 
   if (!request) {
     throw new AppError('Activation request not found', 404);
@@ -211,24 +207,42 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
     throw new AppError('Activation request is already completed', 400);
   }
 
-  if (!codeEntry) {
-    throw new AppError('Activation code not found', 404);
-  }
+  await ActivationCode.updateMany(
+    {
+      used: true,
+      deviceId: request.deviceId,
+      requestId: { $ne: request._id }
+    },
+    {
+      $set: {
+        used: false,
+        deviceId: null,
+        activatedAt: null
+      }
+    }
+  );
 
-  if (codeEntry.used && codeEntry.deviceId !== request.deviceId) {
-    throw new AppError('This code is already activated on another device', 409);
-  }
+  const activatedAt = new Date();
+  await ActivationCode.create({
+    code: normalizedCode,
+    requestId: request._id,
+    used: true,
+    deviceId: request.deviceId,
+    activatedAt,
+    createdAt: activatedAt
+  });
 
-  request.status = 'approved';
+  request.status = 'completed';
   request.assignedCode = normalizedCode;
-  request.approvedAt = new Date();
+  request.approvedAt = activatedAt;
+  request.completedAt = activatedAt;
   request.rejectedAt = null;
   request.rejectionReason = null;
   await request.save();
 
   res.json({
     success: true,
-    message: 'Activation request approved successfully',
+    message: 'Activation request activated successfully',
     request
   });
 });

@@ -4,44 +4,21 @@ const { asyncHandler, AppError } = require('../middleware/errorHandler');
 
 exports.createRequest = asyncHandler(async (req, res) => {
   const normalizedDeviceId = req.body.deviceId.trim();
-
-  const existingActivation = await ActivationCode.findOne({
-    used: true,
+  const request = await ActivationRequest.create({
     deviceId: normalizedDeviceId
-  }).select('code activatedAt');
-
-  if (existingActivation) {
-    return res.json({
-      success: true,
-      status: 'already_activated',
-      message: 'Device already activated',
-      activation: {
-        code: existingActivation.code,
-        activatedAt: existingActivation.activatedAt
-      }
-    });
-  }
-
-  let request = await ActivationRequest.findActiveForDevice(normalizedDeviceId);
-
-  if (!request) {
-    request = await ActivationRequest.create({
-      deviceId: normalizedDeviceId
-    });
-  }
+  });
 
   res.status(201).json({
     success: true,
-    message: request.status === 'approved'
-      ? 'Activation request already approved'
-      : 'Activation request created successfully',
+    message: 'Activation request created successfully',
     request: {
       id: request._id,
       deviceId: request.deviceId,
       status: request.status,
-      assignedCode: request.status === 'approved' ? request.assignedCode : null,
+      assignedCode: request.assignedCode,
       createdAt: request.createdAt,
-      approvedAt: request.approvedAt
+      approvedAt: request.approvedAt,
+      completedAt: request.completedAt
     }
   });
 });
@@ -66,7 +43,7 @@ exports.getRequestStatus = asyncHandler(async (req, res) => {
       id: request._id,
       deviceId: request.deviceId,
       status: request.status,
-      assignedCode: request.status === 'approved' ? request.assignedCode : null,
+      assignedCode: request.assignedCode,
       approvedAt: request.approvedAt,
       completedAt: request.completedAt,
       rejectionReason: request.rejectionReason,
@@ -90,7 +67,7 @@ exports.activate = asyncHandler(async (req, res) => {
     throw new AppError('This activation request belongs to another device', 403);
   }
 
-  if (activationRequest.status !== 'approved') {
+  if (!['approved', 'completed'].includes(activationRequest.status)) {
     throw new AppError('This activation request is not approved yet', 403);
   }
 
@@ -98,34 +75,42 @@ exports.activate = asyncHandler(async (req, res) => {
     throw new AppError('This code is not assigned to the provided activation request', 403);
   }
 
-  const entry = await ActivationCode.findByCode(normalizedCode);
-
-  if (!entry) {
-    throw new AppError('Activation code is invalid', 400);
-  }
-
-  if (entry.used && entry.deviceId !== normalizedDeviceId) {
-    throw new AppError('This code is already activated on another device', 403);
-  }
-
-  if (entry.used && entry.deviceId === normalizedDeviceId) {
-    if (activationRequest.status !== 'completed') {
-      activationRequest.status = 'completed';
-      activationRequest.completedAt = entry.activatedAt || new Date();
-      await activationRequest.save();
+  await ActivationCode.updateMany(
+    {
+      used: true,
+      deviceId: normalizedDeviceId,
+      requestId: { $ne: activationRequest._id }
+    },
+    {
+      $set: {
+        used: false,
+        deviceId: null,
+        activatedAt: null
+      }
     }
+  );
 
-    return res.json({
-      success: true,
-      message: 'Already activated on this device',
-      activatedAt: entry.activatedAt
+  const activatedAt = new Date();
+  let entry = await ActivationCode.findOne({
+    requestId: activationRequest._id,
+    deviceId: normalizedDeviceId,
+    code: normalizedCode
+  }).sort({ createdAt: -1 });
+
+  if (entry) {
+    entry.used = true;
+    entry.activatedAt = activatedAt;
+    await entry.save();
+  } else {
+    entry = await ActivationCode.create({
+      code: normalizedCode,
+      requestId: activationRequest._id,
+      used: true,
+      deviceId: normalizedDeviceId,
+      activatedAt,
+      createdAt: activatedAt
     });
   }
-
-  entry.used = true;
-  entry.deviceId = normalizedDeviceId;
-  entry.activatedAt = new Date();
-  await entry.save();
 
   activationRequest.status = 'completed';
   activationRequest.completedAt = entry.activatedAt;
