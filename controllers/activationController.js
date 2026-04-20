@@ -89,8 +89,21 @@ exports.activate = asyncHandler(async (req, res) => {
     throw new AppError('This activation request is not approved yet', 403);
   }
 
-  if (activationRequest.assignedCode !== normalizedCode) {
-    throw new AppError('This code is not assigned to the provided activation request', 403);
+  const matchingCodeEntry = await ActivationCode.findOne({
+    code: normalizedCode
+  }).sort({ createdAt: -1 });
+
+  const codeBelongsToThisRequest = activationRequest.assignedCode === normalizedCode;
+  const codeCanBeReusedByThisDevice = matchingCodeEntry && (
+    !matchingCodeEntry.used ||
+    (
+      matchingCodeEntry.deviceId === normalizedDeviceId &&
+      String(matchingCodeEntry.requestId || '') === String(activationRequest._id)
+    )
+  );
+
+  if (!codeBelongsToThisRequest && !codeCanBeReusedByThisDevice) {
+    throw new AppError('This code is not available for the provided activation request', 403);
   }
 
   await ActivationCode.updateMany(
@@ -131,6 +144,7 @@ exports.activate = asyncHandler(async (req, res) => {
   }
 
   activationRequest.status = 'completed';
+  activationRequest.assignedCode = normalizedCode;
   activationRequest.completedAt = entry.activatedAt;
   await activationRequest.save();
 
