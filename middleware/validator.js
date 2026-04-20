@@ -28,7 +28,6 @@ const validateAddCode = [
     .trim()
     .notEmpty().withMessage('Code is required')
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .matches(/^[A-Z0-9-_]+$/i).withMessage('Code can only contain letters, numbers, hyphens and underscores')
     .customSanitizer(value => value.toUpperCase()),
   handleValidationErrors
 ];
@@ -98,9 +97,7 @@ const validateApproveActivationRequest = [
   body('code')
     .trim()
     .notEmpty().withMessage('Code is required')
-    .trim()
     .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
-    .matches(/^[A-Z0-9-_]+$/i).withMessage('Code can only contain letters, numbers, hyphens and underscores')
     .customSanitizer(value => value.toUpperCase()),
   handleValidationErrors
 ];

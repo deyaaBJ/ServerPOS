@@ -3,6 +3,8 @@ const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 const attachDeviceUsageToRequests = async (requests) => {
   if (!requests.length) {
     return [];
@@ -196,7 +198,7 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
 
 exports.approveActivationRequest = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
-  const normalizedCode = req.body.code.trim().toUpperCase();
+  const normalizedCode = normalizeCode(req.body.code);
   const request = await ActivationRequest.findById(requestId);
 
   if (!request) {

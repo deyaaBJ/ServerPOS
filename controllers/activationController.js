@@ -2,8 +2,27 @@ const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 
+const normalizeCode = (value) => String(value || '').trim().toUpperCase();
+
 exports.createRequest = asyncHandler(async (req, res) => {
   const normalizedDeviceId = req.body.deviceId.trim();
+
+  const previousRequests = await ActivationRequest.find({
+    deviceId: normalizedDeviceId
+  }).select('_id');
+
+  const previousRequestIds = previousRequests.map((request) => request._id);
+
+  if (previousRequestIds.length) {
+    await ActivationCode.deleteMany({
+      requestId: { $in: previousRequestIds }
+    });
+
+    await ActivationRequest.deleteMany({
+      _id: { $in: previousRequestIds }
+    });
+  }
+
   const request = await ActivationRequest.create({
     deviceId: normalizedDeviceId
   });
@@ -54,7 +73,7 @@ exports.getRequestStatus = asyncHandler(async (req, res) => {
 
 exports.activate = asyncHandler(async (req, res) => {
   const { requestId, code, deviceId } = req.body;
-  const normalizedCode = code.toUpperCase().trim();
+  const normalizedCode = normalizeCode(code);
   const normalizedDeviceId = deviceId.trim();
 
   const activationRequest = await ActivationRequest.findById(requestId);
