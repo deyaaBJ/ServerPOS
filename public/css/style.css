@@ -424,6 +424,11 @@ tr.highlight {
   color: #856404;
 }
 
+.badge-dark {
+  background: #e9ecef;
+  color: #343a40;
+}
+
 /* Action Buttons */
 .action-buttons {
   display: flex;
@@ -493,6 +498,15 @@ tr.highlight {
 
 .reject-btn:hover {
   background: #c92a2a;
+}
+
+.deactivate-btn {
+  background: #495057;
+  color: white;
+}
+
+.deactivate-btn:hover {
+  background: #343a40;
 }
 
 /* Status Indicators */

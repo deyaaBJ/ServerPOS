@@ -7,7 +7,8 @@ const {
   validateChangePassword,
   validateActivationRequestStatus,
   validateApproveActivationRequest,
-  validateRejectActivationRequest
+  validateRejectActivationRequest,
+  validateDeactivateActivationRequest
 } = require('../middleware/validator');
 
 router.post('/login', validateLogin, adminController.login);
@@ -25,6 +26,12 @@ router.post(
   adminOnly,
   validateRejectActivationRequest,
   adminController.rejectActivationRequest
+);
+router.post(
+  '/activation-requests/:requestId/deactivate',
+  adminOnly,
+  validateDeactivateActivationRequest,
+  adminController.deactivateActivationRequest
 );
 router.delete(
   '/activation-requests/:requestId',

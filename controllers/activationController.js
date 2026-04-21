@@ -20,14 +20,19 @@ const refreshExpiredRequestState = async (request) => {
     },
     {
       $set: {
-        used: false
+        used: false,
+        deviceId: null,
+        activatedAt: null
       }
     }
   );
 
   request.status = 'pending';
+  request.assignedCode = null;
   request.completedAt = null;
   request.approvedAt = null;
+  request.rejectedAt = null;
+  request.rejectionReason = null;
   await request.save();
 
   return request;

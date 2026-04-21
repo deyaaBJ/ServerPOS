@@ -21,14 +21,19 @@ const refreshExpiredRequestState = async (request) => {
     },
     {
       $set: {
-        used: false
+        used: false,
+        deviceId: null,
+        activatedAt: null
       }
     }
   );
 
   request.status = 'pending';
+  request.assignedCode = null;
   request.completedAt = null;
   request.approvedAt = null;
+  request.rejectedAt = null;
+  request.rejectionReason = null;
   await request.save();
 
   return request;
@@ -308,6 +313,52 @@ exports.rejectActivationRequest = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Activation request rejected successfully',
+    request
+  });
+});
+
+exports.deactivateActivationRequest = asyncHandler(async (req, res) => {
+  const { requestId } = req.params;
+  const reason = req.body.reason?.trim() || 'Deactivated manually by admin';
+
+  const request = await ActivationRequest.findById(requestId);
+
+  if (!request) {
+    throw new AppError('Activation request not found', 404);
+  }
+
+  await refreshExpiredRequestState(request);
+
+  if (request.status !== 'completed') {
+    throw new AppError('Only completed activation requests can be deactivated', 400);
+  }
+
+  await ActivationCode.updateMany(
+    {
+      requestId: request._id,
+      deviceId: request.deviceId,
+      used: true
+    },
+    {
+      $set: {
+        used: false,
+        deviceId: null,
+        activatedAt: null
+      }
+    }
+  );
+
+  request.status = 'deactivated';
+  request.assignedCode = null;
+  request.approvedAt = null;
+  request.completedAt = null;
+  request.rejectedAt = new Date();
+  request.rejectionReason = reason;
+  await request.save();
+
+  res.json({
+    success: true,
+    message: 'Activation cancelled successfully',
     request
   });
 });

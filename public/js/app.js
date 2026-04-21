@@ -69,7 +69,7 @@ const utils = {
     return (new Date() - created) < CONFIG.HIGHLIGHT_DURATION;
   },
 
-  canManageRequest: (request) => request.status !== 'completed',
+  canManageRequest: (request) => !['completed', 'deactivated'].includes(request.status),
   canArchiveRequest: (request) => request.status !== 'pending',
 
   getDeviceUsageHtml: (request) => {
@@ -96,6 +96,7 @@ const utils = {
     if (request.status === 'completed') return '<span class="badge badge-success">تم التفعيل</span>';
     if (request.status === 'approved') return '<span class="badge badge-warning">تم ربط الكود</span>';
     if (request.status === 'rejected') return '<span class="badge badge-danger">مرفوض</span>';
+    if (request.status === 'deactivated') return '<span class="badge badge-dark">تم إلغاء التفعيل</span>';
     return '<span class="badge badge-primary">معلق</span>';
   },
 
@@ -104,6 +105,10 @@ const utils = {
 
     if (request.status === 'rejected' && request.rejectionReason) {
       notes.push(`<div class="request-note">سبب الرفض: ${utils.escapeHtml(request.rejectionReason)}</div>`);
+    }
+
+    if (request.status === 'deactivated' && request.rejectionReason) {
+      notes.push(`<div class="request-note">سبب إلغاء التفعيل: ${utils.escapeHtml(request.rejectionReason)}</div>`);
     }
 
     if (request.status === 'approved' || request.status === 'completed') {
@@ -131,7 +136,8 @@ const utils = {
     if (compact) {
       return `
         <div class="request-menu-list">
-          ${request.status !== 'completed' ? `<button class="request-menu-item" data-action="approve-request" data-request-id="${request._id}">اعتماد الكود</button><button class="request-menu-item" data-action="reject-request" data-request-id="${request._id}">رفض</button>` : ''}
+          ${request.status !== 'completed' && request.status !== 'deactivated' ? `<button class="request-menu-item" data-action="approve-request" data-request-id="${request._id}">اعتماد الكود</button><button class="request-menu-item" data-action="reject-request" data-request-id="${request._id}">رفض</button>` : ''}
+          ${request.status === 'completed' ? `<button class="request-menu-item danger" data-action="deactivate-request" data-request-id="${request._id}">إلغاء التفعيل</button>` : ''}
           ${utils.canArchiveRequest(request) ? `<button class="request-menu-item danger" data-action="delete-request" data-request-id="${request._id}">حذف الطلب</button>` : ''}
         </div>
       `;
@@ -142,6 +148,7 @@ const utils = {
         ${inputHtml}
         <button class="action-btn approve-btn" data-action="approve-request" data-request-id="${request._id}" ${disabled}>اعتماد الكود</button>
         <button class="action-btn reject-btn" data-action="reject-request" data-request-id="${request._id}" ${disabled}>رفض</button>
+        ${request.status === 'completed' ? `<button class="action-btn deactivate-btn" data-action="deactivate-request" data-request-id="${request._id}">إلغاء التفعيل</button>` : ''}
         ${utils.canArchiveRequest(request) ? `<button class="action-btn delete-btn" data-action="delete-request" data-request-id="${request._id}">حذف الطلب</button>` : ''}
       </div>
     `;
@@ -204,6 +211,7 @@ const api = {
     getActivationRequests: () => api.request('/admin/activation-requests'),
     approveRequest: (requestId, code) => api.request(`/admin/activation-requests/${requestId}/approve`, { method: 'POST', body: { code } }),
     rejectRequest: (requestId, reason) => api.request(`/admin/activation-requests/${requestId}/reject`, { method: 'POST', body: { reason } }),
+    deactivateRequest: (requestId, reason) => api.request(`/admin/activation-requests/${requestId}/deactivate`, { method: 'POST', body: { reason } }),
     deleteRequest: (requestId) => api.request(`/admin/activation-requests/${requestId}`, { method: 'DELETE' }),
   },
 
@@ -501,6 +509,32 @@ const handlers = {
     }
   },
 
+  deactivateRequest: async (requestId) => {
+    const request = state.requests.find((item) => item._id === requestId);
+    if (!request) return;
+
+    if (request.status !== 'completed') {
+      utils.showAlert('mainAlert', 'يمكن إلغاء التفعيل فقط للطلبات المفعلة', 'warning');
+      return;
+    }
+
+    const reasonInput = prompt('سبب إلغاء التفعيل (اختياري):');
+    if (reasonInput === null) {
+      return;
+    }
+
+    if (!confirm('سيتم إلغاء التفعيل وفك ربط الكود عن هذا الطلب. هل تريد المتابعة؟')) return;
+
+    try {
+      await api.auth.deactivateRequest(requestId, reasonInput.trim());
+      handlers.hideRequestDetailsModal();
+      utils.showAlert('mainAlert', 'تم إلغاء التفعيل بنجاح', 'success', 4000);
+      await Promise.all([handlers.loadActivationRequests(), handlers.loadStats()]);
+    } catch (error) {
+      utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
+    }
+  },
+
   showRequestDetails: (requestId) => {
     const request = state.requests.find((item) => item._id === requestId);
     if (!request || !elements.requestDetailsContent || !elements.requestDetailsModal) return;
@@ -589,6 +623,7 @@ const handlers = {
 
     if (action === 'approve-request') return handlers.approveRequest(requestId, button);
     if (action === 'reject-request') return handlers.rejectRequest(requestId);
+    if (action === 'deactivate-request') return handlers.deactivateRequest(requestId);
     if (action === 'delete-request') return handlers.deleteRequest(requestId);
     if (action === 'show-request-details') return handlers.showRequestDetails(requestId);
   },

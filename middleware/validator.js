@@ -146,6 +146,18 @@ const validateRejectActivationRequest = [
   handleValidationErrors
 ];
 
+const validateDeactivateActivationRequest = [
+  param('requestId')
+    .trim()
+    .notEmpty().withMessage('Request ID is required')
+    .isMongoId().withMessage('Invalid request ID'),
+  body('reason')
+    .optional()
+    .trim()
+    .isLength({ max: 250 }).withMessage('Reason cannot exceed 250 characters'),
+  handleValidationErrors
+];
+
 const validateDeleteCode = [
   param('code')
     .trim()
@@ -164,5 +176,6 @@ module.exports = {
   validateActivationRequestStatus,
   validateApproveActivationRequest,
   validateRejectActivationRequest,
+  validateDeactivateActivationRequest,
   validateDeleteCode
 };
