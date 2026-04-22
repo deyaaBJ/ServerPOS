@@ -39,6 +39,77 @@ const refreshExpiredRequestState = async (request) => {
   return request;
 };
 
+const getPreviousRequestsDetails = async (deviceId, currentRequestId = null) => {
+  const filter = {
+    deviceId: deviceId.trim()
+  };
+
+  if (currentRequestId) {
+    filter._id = { $ne: currentRequestId };
+  }
+
+  const previousRequests = await ActivationRequest.find(filter)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!previousRequests.length) {
+    return [];
+  }
+
+  const requestIds = previousRequests.map((request) => request._id);
+  const codes = await ActivationCode.find({
+    requestId: { $in: requestIds }
+  })
+    .sort({ createdAt: -1 })
+    .select('requestId code used activatedAt createdAt')
+    .lean();
+
+  const codesByRequestId = new Map();
+  for (const codeEntry of codes) {
+    const key = String(codeEntry.requestId);
+    if (!codesByRequestId.has(key)) {
+      codesByRequestId.set(key, []);
+    }
+    codesByRequestId.get(key).push({
+      code: codeEntry.code,
+      used: codeEntry.used,
+      activatedAt: codeEntry.activatedAt,
+      createdAt: codeEntry.createdAt
+    });
+  }
+
+  return previousRequests.map((request) => ({
+    id: request._id,
+    status: request.status,
+    assignedCode: request.assignedCode,
+    createdAt: request.createdAt,
+    approvedAt: request.approvedAt,
+    completedAt: request.completedAt,
+    codes: codesByRequestId.get(String(request._id)) || []
+  }));
+};
+
+const deletePreviousRequestsForDevice = async (deviceId, currentRequestId) => {
+  const previousRequests = await ActivationRequest.find({
+    deviceId: deviceId.trim(),
+    _id: { $ne: currentRequestId }
+  }).select('_id');
+
+  const previousRequestIds = previousRequests.map((request) => request._id);
+
+  if (!previousRequestIds.length) {
+    return;
+  }
+
+  await ActivationCode.deleteMany({
+    requestId: { $in: previousRequestIds }
+  });
+
+  await ActivationRequest.deleteMany({
+    _id: { $in: previousRequestIds }
+  });
+};
+
 const attachDeviceUsageToRequests = async (requests) => {
   if (!requests.length) {
     return [];
@@ -94,6 +165,13 @@ const attachDeviceUsageToRequests = async (requests) => {
     };
   });
 };
+
+const attachPreviousRequestsToRequests = async (requests) => Promise.all(
+  requests.map(async (request) => ({
+    ...request,
+    previousRequests: await getPreviousRequestsDetails(request.deviceId, request._id)
+  }))
+);
 
 // Login
 exports.login = asyncHandler(async (req, res) => {
@@ -227,10 +305,11 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
   );
 
   const requestsWithDeviceUsage = await attachDeviceUsageToRequests(refreshedRequests);
+  const requestsWithPreviousRequests = await attachPreviousRequestsToRequests(requestsWithDeviceUsage);
 
   res.json({
     success: true,
-    requests: requestsWithDeviceUsage
+    requests: requestsWithPreviousRequests
   });
 });
 
@@ -282,10 +361,17 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
   request.rejectionReason = null;
   await request.save();
 
+  await deletePreviousRequestsForDevice(request.deviceId, request._id);
+
+  const previousRequests = await getPreviousRequestsDetails(request.deviceId, request._id);
+
   res.json({
     success: true,
     message: 'Activation request activated successfully',
-    request
+    request: {
+      ...request.toObject(),
+      previousRequests
+    }
   });
 });
 

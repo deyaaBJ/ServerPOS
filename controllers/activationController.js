@@ -38,28 +38,85 @@ const refreshExpiredRequestState = async (request) => {
   return request;
 };
 
-exports.createRequest = asyncHandler(async (req, res) => {
-  const normalizedDeviceId = req.body.deviceId.trim();
+const getPreviousRequestsDetails = async (deviceId, currentRequestId = null) => {
+  const filter = {
+    deviceId: deviceId.trim()
+  };
 
+  if (currentRequestId) {
+    filter._id = { $ne: currentRequestId };
+  }
+
+  const previousRequests = await ActivationRequest.find(filter)
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!previousRequests.length) {
+    return [];
+  }
+
+  const requestIds = previousRequests.map((request) => request._id);
+  const codes = await ActivationCode.find({
+    requestId: { $in: requestIds }
+  })
+    .sort({ createdAt: -1 })
+    .select('requestId code used activatedAt createdAt')
+    .lean();
+
+  const codesByRequestId = new Map();
+  for (const codeEntry of codes) {
+    const key = String(codeEntry.requestId);
+    if (!codesByRequestId.has(key)) {
+      codesByRequestId.set(key, []);
+    }
+    codesByRequestId.get(key).push({
+      code: codeEntry.code,
+      used: codeEntry.used,
+      activatedAt: codeEntry.activatedAt,
+      createdAt: codeEntry.createdAt
+    });
+  }
+
+  return previousRequests.map((request) => ({
+    id: request._id,
+    status: request.status,
+    assignedCode: request.assignedCode,
+    createdAt: request.createdAt,
+    approvedAt: request.approvedAt,
+    completedAt: request.completedAt,
+    codes: codesByRequestId.get(String(request._id)) || []
+  }));
+};
+
+const deletePreviousRequestsForDevice = async (deviceId, currentRequestId) => {
   const previousRequests = await ActivationRequest.find({
-    deviceId: normalizedDeviceId
+    deviceId: deviceId.trim(),
+    _id: { $ne: currentRequestId }
   }).select('_id');
 
   const previousRequestIds = previousRequests.map((request) => request._id);
 
-  if (previousRequestIds.length) {
-    await ActivationCode.deleteMany({
-      requestId: { $in: previousRequestIds }
-    });
-
-    await ActivationRequest.deleteMany({
-      _id: { $in: previousRequestIds }
-    });
+  if (!previousRequestIds.length) {
+    return;
   }
+
+  await ActivationCode.deleteMany({
+    requestId: { $in: previousRequestIds }
+  });
+
+  await ActivationRequest.deleteMany({
+    _id: { $in: previousRequestIds }
+  });
+};
+
+exports.createRequest = asyncHandler(async (req, res) => {
+  const normalizedDeviceId = req.body.deviceId.trim();
 
   const request = await ActivationRequest.create({
     deviceId: normalizedDeviceId
   });
+
+  const previousRequests = await getPreviousRequestsDetails(normalizedDeviceId, request._id);
 
   res.status(201).json({
     success: true,
@@ -71,7 +128,8 @@ exports.createRequest = asyncHandler(async (req, res) => {
       assignedCode: request.assignedCode,
       createdAt: request.createdAt,
       approvedAt: request.approvedAt,
-      completedAt: request.completedAt
+      completedAt: request.completedAt,
+      previousRequests
     }
   });
 });
@@ -92,6 +150,8 @@ exports.getRequestStatus = asyncHandler(async (req, res) => {
     throw new AppError('This request does not belong to this device', 403);
   }
 
+  const previousRequests = await getPreviousRequestsDetails(request.deviceId, request._id);
+
   res.json({
     success: true,
     request: {
@@ -102,7 +162,8 @@ exports.getRequestStatus = asyncHandler(async (req, res) => {
       approvedAt: request.approvedAt,
       completedAt: request.completedAt,
       rejectionReason: request.rejectionReason,
-      createdAt: request.createdAt
+      createdAt: request.createdAt,
+      previousRequests
     }
   });
 });
@@ -186,6 +247,8 @@ exports.activate = asyncHandler(async (req, res) => {
   activationRequest.assignedCode = normalizedCode;
   activationRequest.completedAt = entry.activatedAt;
   await activationRequest.save();
+
+  await deletePreviousRequestsForDevice(normalizedDeviceId, activationRequest._id);
 
   console.log(`Activated: ${normalizedCode} for device: ${normalizedDeviceId}`);
 
