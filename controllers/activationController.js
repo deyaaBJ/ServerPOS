@@ -1,7 +1,22 @@
 const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
-const { isCodeExpired, normalizeCode } = require('../utils/code');
+const { isCodeExpired, normalizeCode, getCodeExpiryDate } = require('../utils/code');
+const { signActivationData } = require('../utils/activationSignature');
+
+const buildActivationPayload = ({ deviceId, activationCode, activatedAt }) => {
+  const activation = {
+    deviceId,
+    activationCode
+  };
+
+  const expiresAt = getCodeExpiryDate(activationCode, activatedAt);
+  if (expiresAt) {
+    activation.expiresAt = expiresAt.toISOString();
+  }
+
+  return activation;
+};
 
 const refreshExpiredRequestState = async (request) => {
   if (!request?.assignedCode || !request?.completedAt) {
@@ -252,9 +267,15 @@ exports.activate = asyncHandler(async (req, res) => {
 
   console.log(`Activated: ${normalizedCode} for device: ${normalizedDeviceId}`);
 
-  res.json({
-    success: true,
-    message: 'Activation successful',
+  const activation = buildActivationPayload({
+    deviceId: normalizedDeviceId,
+    activationCode: normalizedCode,
     activatedAt: entry.activatedAt
+  });
+  const signature = signActivationData(activation);
+
+  res.json({
+    activation,
+    signature
   });
 });

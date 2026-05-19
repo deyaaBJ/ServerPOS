@@ -10,6 +10,7 @@ const cors = require('cors');
 const connectDB = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
 const Admin = require('./models/Admin');
+const { getConfiguredPublicKey } = require('./utils/activationSignature');
 
 // Import routes
 const adminRoutes = require('./routes/admin');
@@ -28,6 +29,11 @@ for (const key of REQUIRED_ENV) {
     console.error(`❌ Missing required environment variable: ${key}`);
     process.exit(1);
   }
+}
+
+if (!process.env.RSA_PRIVATE_KEY && !process.env.RSA_PRIVATE_KEY_PATH) {
+  console.error('âŒ Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
+  process.exit(1);
 }
 
 // Trust proxy for Render
@@ -196,6 +202,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/admin', adminRoutes);
 app.use('/api/codes', codeRoutes);
 app.use('/api/activate', activationRoutes);
+
+app.get('/api/activate/public-key', (req, res) => {
+  const publicKey = getConfiguredPublicKey();
+
+  if (!publicKey) {
+    return res.status(404).json({
+      success: false,
+      message: 'RSA public key is not configured on the server'
+    });
+  }
+
+  res.json({
+    success: true,
+    algorithm: 'RSA-SHA256',
+    publicKey
+  });
+});
 
 // Health check
 app.get('/api/health', async (req, res) => {
