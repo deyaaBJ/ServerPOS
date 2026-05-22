@@ -6,9 +6,19 @@ const PRIVATE_KEY_PATH_ENV_NAME = 'RSA_PRIVATE_KEY_PATH';
 const PUBLIC_KEY_ENV_NAME = 'RSA_PUBLIC_KEY';
 const LIFETIME_MARKER = 'LIFETIME';
 
+const TEMPORARY_ACTIVATION_PATTERN = /^DAY-(\d+)$/i;
+
 const buildActivationSignaturePayload = (activation) => {
-  const expiryValue = activation.expiresAt || LIFETIME_MARKER;
-  return `${activation.deviceId}|${activation.activationCode}|${expiryValue}`;
+  const isTemporary = TEMPORARY_ACTIVATION_PATTERN.test(activation.activationCode);
+
+  if (isTemporary) {
+    if (!activation.expiresAt) {
+      throw new Error('Temporary activation must have expiresAt');
+    }
+    return `${activation.deviceId}|${activation.activationCode}|${activation.expiresAt}`;
+  }
+
+  return `${activation.deviceId}|${activation.activationCode}|LIFETIME`;
 };
 
 const resolvePrivateKey = () => {
