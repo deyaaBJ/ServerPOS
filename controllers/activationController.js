@@ -275,7 +275,8 @@ exports.activate = asyncHandler(async (req, res) => {
   const signature = signActivationData(activation);
 
   res.json({
-    activation,
-    signature
-  });
+  success: true, 
+  activation,
+  signature
+});
 });
