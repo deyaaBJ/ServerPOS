@@ -88,6 +88,10 @@ const validateActivation = [
     .trim()
     .notEmpty().withMessage('Device ID is required')
     .isLength({ min: 3, max: 100 }).withMessage('Invalid device ID'),
+  body('deviceFingerprint')
+    .optional()
+    .trim()
+    .isLength({ min: 8, max: 512 }).withMessage('Invalid device fingerprint'),
   handleValidationErrors
 ];
 
@@ -108,6 +112,65 @@ const validateActivationRequestStatus = [
     .optional()
     .trim()
     .isLength({ min: 3, max: 100 }).withMessage('Invalid device ID'),
+  handleValidationErrors
+];
+
+const validateLicenseValidate = [
+  body('deviceId')
+    .trim()
+    .notEmpty().withMessage('Device ID is required')
+    .isLength({ min: 3, max: 100 }).withMessage('Invalid device ID'),
+  body('licenseToken')
+    .trim()
+    .notEmpty().withMessage('License token is required')
+    .isLength({ min: 32, max: 4096 }).withMessage('Invalid license token'),
+  body('deviceFingerprint')
+    .optional()
+    .trim()
+    .isLength({ min: 8, max: 512 }).withMessage('Invalid device fingerprint'),
+  body('clientTime')
+    .optional()
+    .isISO8601().withMessage('clientTime must be an ISO 8601 date'),
+  handleValidationErrors
+];
+
+const validateLicenseCheckDevice = [
+  body('deviceId')
+    .trim()
+    .notEmpty().withMessage('Device ID is required')
+    .isLength({ min: 3, max: 100 }).withMessage('Invalid device ID'),
+  body('code')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
+    .customSanitizer(normalizeCode),
+  body('licenseToken')
+    .optional()
+    .trim()
+    .isLength({ min: 32, max: 4096 }).withMessage('Invalid license token'),
+  body('deviceFingerprint')
+    .optional()
+    .trim()
+    .isLength({ min: 8, max: 512 }).withMessage('Invalid device fingerprint'),
+  body().custom((value) => {
+    if (!value?.code && !value?.licenseToken) {
+      throw new Error('Either code or licenseToken is required');
+    }
+    return true;
+  }),
+  handleValidationErrors
+];
+
+const validateLicenseRevoke = [
+  body('code')
+    .trim()
+    .notEmpty().withMessage('Code is required')
+    .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
+    .customSanitizer(normalizeCode),
+  body('reason')
+    .trim()
+    .notEmpty().withMessage('Reason is required')
+    .isLength({ min: 3, max: 250 }).withMessage('Reason must be 3-250 characters'),
   handleValidationErrors
 ];
 
@@ -174,6 +237,9 @@ module.exports = {
   validateActivation,
   validateActivationRequest,
   validateActivationRequestStatus,
+  validateLicenseValidate,
+  validateLicenseCheckDevice,
+  validateLicenseRevoke,
   validateApproveActivationRequest,
   validateRejectActivationRequest,
   validateDeactivateActivationRequest,

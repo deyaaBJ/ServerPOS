@@ -26,6 +26,25 @@ const activationCodeSchema = new mongoose.Schema({
     default: null,
     index: true
   },
+  status: {
+    type: String,
+    enum: ['active', 'expired', 'revoked'],
+    default: 'active',
+    index: true
+  },
+  expiresAt: {
+    type: Date,
+    default: null,
+    index: true
+  },
+  lastValidatedAt: {
+    type: Date,
+    default: null
+  },
+  revokedAt: {
+    type: Date,
+    default: null
+  },
   activatedAt: { 
     type: Date, 
     default: null 
@@ -45,6 +64,7 @@ const activationCodeSchema = new mongoose.Schema({
 activationCodeSchema.index({ code: 1, used: 1 });
 activationCodeSchema.index({ deviceId: 1, used: 1 });
 activationCodeSchema.index({ requestId: 1, deviceId: 1 });
+activationCodeSchema.index({ code: 1, deviceId: 1, status: 1 });
 
 // Virtual for status text
 activationCodeSchema.virtual('statusText').get(function() {

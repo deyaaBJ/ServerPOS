@@ -8,7 +8,8 @@ const {
   validateActivationRequestStatus,
   validateApproveActivationRequest,
   validateRejectActivationRequest,
-  validateDeactivateActivationRequest
+  validateDeactivateActivationRequest,
+  validateLicenseRevoke
 } = require('../middleware/validator');
 
 router.post('/login', validateLogin, adminController.login);
@@ -32,6 +33,12 @@ router.post(
   adminOnly,
   validateDeactivateActivationRequest,
   adminController.deactivateActivationRequest
+);
+router.post(
+  '/licenses/revoke',
+  adminOnly,
+  validateLicenseRevoke,
+  require('../controllers/activationController').revokeLicense
 );
 router.delete(
   '/activation-requests/:requestId',

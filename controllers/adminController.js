@@ -23,7 +23,11 @@ const refreshExpiredRequestState = async (request) => {
       $set: {
         used: false,
         deviceId: null,
-        activatedAt: null
+        activatedAt: null,
+        expiresAt: null,
+        lastValidatedAt: null,
+        status: 'revoked',
+        revokedAt: new Date()
       }
     }
   );

@@ -167,6 +167,18 @@ const activationLimiter = rateLimit({
 });
 app.use('/api/activate', activationLimiter);
 
+const licenseLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many license validation attempts. Please wait a minute.'
+  }
+});
+app.use('/api/activate/license', licenseLimiter);
+
 // Body parsing
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
