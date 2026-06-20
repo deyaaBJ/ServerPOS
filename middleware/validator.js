@@ -123,6 +123,14 @@ const validateActivationDeviceStatus = [
   handleValidationErrors
 ];
 
+const validateActivationDeviceStatusBody = [
+  body('deviceId')
+    .trim()
+    .notEmpty().withMessage('deviceId is required')
+    .isLength({ min: 3, max: 100 }).withMessage('deviceId is required'),
+  handleValidationErrors
+];
+
 const validateLicenseValidate = [
   body('deviceId')
     .trim()
@@ -246,6 +254,7 @@ module.exports = {
   validateActivationRequest,
   validateActivationRequestStatus,
   validateActivationDeviceStatus,
+  validateActivationDeviceStatusBody,
   validateLicenseValidate,
   validateLicenseCheckDevice,
   validateLicenseRevoke,

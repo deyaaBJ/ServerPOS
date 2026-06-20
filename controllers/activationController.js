@@ -107,7 +107,7 @@ exports.activate = asyncHandler(async (req, res) => {
 exports.getDeviceActivationStatus = asyncHandler(async (req, res) => {
   try {
     const result = await getDeviceActivationStatus({
-      deviceId: req.query.deviceId,
+      deviceId: req.query.deviceId || req.body.deviceId,
       req
     });
 
