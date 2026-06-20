@@ -332,35 +332,38 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
     throw new AppError('Activation request is already completed', 400);
   }
 
-  await ActivationCode.updateMany(
+  const approvedAt = new Date();
+  await ActivationCode.findOneAndUpdate(
     {
-      used: true,
-      deviceId: request.deviceId,
-      requestId: { $ne: request._id }
+      requestId: request._id
     },
     {
       $set: {
+        code: normalizedCode,
+        requestId: request._id,
         used: false,
         deviceId: null,
-        activatedAt: null
+        activatedAt: null,
+        expiresAt: null,
+        lastValidatedAt: null,
+        status: 'active',
+        revokedAt: null
+      },
+      $setOnInsert: {
+        createdAt: approvedAt
       }
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
     }
   );
 
-  const activatedAt = new Date();
-  await ActivationCode.create({
-    code: normalizedCode,
-    requestId: request._id,
-    used: true,
-    deviceId: request.deviceId,
-    activatedAt,
-    createdAt: activatedAt
-  });
-
-  request.status = 'completed';
+  request.status = 'approved';
   request.assignedCode = normalizedCode;
-  request.approvedAt = activatedAt;
-  request.completedAt = activatedAt;
+  request.approvedAt = approvedAt;
+  request.completedAt = null;
   request.rejectedAt = null;
   request.rejectionReason = null;
   await request.save();
@@ -371,7 +374,7 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    message: 'Activation request activated successfully',
+    message: 'Activation request approved successfully',
     request: {
       ...request.toObject(),
       previousRequests

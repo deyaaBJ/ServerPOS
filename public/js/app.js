@@ -7,6 +7,7 @@ const CONFIG = {
   REFRESH_INTERVAL: 60000,
   STATS_REFRESH_INTERVAL: 30000,
   HIGHLIGHT_DURATION: 300000,
+  REQUEST_TIMEOUT: 20000,
 };
 
 const state = {
@@ -176,6 +177,10 @@ const utils = {
 const api = {
   request: async (endpoint, options = {}) => {
     const url = `${CONFIG.API_BASE_URL}/api${endpoint}`;
+    const controller = options.signal ? null : new AbortController();
+    const timeoutId = controller
+      ? setTimeout(() => controller.abort(), CONFIG.REQUEST_TIMEOUT)
+      : null;
     const config = {
       credentials: 'include',
       headers: {
@@ -183,21 +188,31 @@ const api = {
         Accept: 'application/json',
         ...options.headers,
       },
+      signal: options.signal || controller?.signal,
       ...options,
     };
 
-    if (config.body && typeof config.body === 'object') {
-      config.body = JSON.stringify(config.body);
+    try {
+      if (config.body && typeof config.body === 'object') {
+        config.body = JSON.stringify(config.body);
+      }
+
+      const response = await fetch(url, config);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || data.error?.message || `HTTP ${response.status}`);
+      }
+
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('انتهت مهلة الاتصال بالخادم، حاول مرة أخرى');
+      }
+      throw error;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
     }
-
-    const response = await fetch(url, config);
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || `HTTP ${response.status}`);
-    }
-
-    return data;
   },
 
   auth: {
@@ -456,13 +471,28 @@ const handlers = {
       return;
     }
 
+    const originalText = sourceButton?.innerHTML;
+    if (sourceButton) {
+      sourceButton.disabled = true;
+      sourceButton.innerHTML = 'جار الاعتماد...';
+    }
+
     try {
       const data = await api.auth.approveRequest(requestId, code);
       const activatedCode = data?.request?.assignedCode || code;
       utils.showAlert('mainAlert', `تم اعتماد الطلب بالكود <strong>${utils.escapeHtml(activatedCode)}</strong> بنجاح`, 'success', 5000);
-      await Promise.all([handlers.loadActivationRequests(), handlers.loadStats()]);
+      try {
+        await Promise.all([handlers.loadActivationRequests(), handlers.loadStats()]);
+      } catch (refreshError) {
+        utils.showAlert('mainAlert', 'تم الاعتماد، لكن تعذر تحديث القائمة تلقائيًا. اضغط تحديث بعد لحظات.', 'warning');
+      }
     } catch (error) {
       utils.showAlert('mainAlert', `❌ ${error.message}`, 'danger');
+    } finally {
+      if (sourceButton) {
+        sourceButton.disabled = false;
+        sourceButton.innerHTML = originalText;
+      }
     }
   },
 
