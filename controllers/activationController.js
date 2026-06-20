@@ -5,6 +5,7 @@ const {
   activateLicense,
   revalidateLicense,
   getLicenseStatus,
+  getDeviceActivationStatus,
   refreshLicenseToken,
   revokeLicense
 } = require('../services/licenseService');
@@ -29,6 +30,17 @@ const sendServiceError = (res, error) => {
   const statusCode = error.statusCode || 500;
   return res.status(statusCode).json(getErrorPayload(error));
 };
+
+const buildLicensePayload = (license) => ({
+  id: license._id,
+  code: license.code,
+  type: license.type,
+  status: license.status,
+  expiresAt: license.expiresAt,
+  revalidationIntervalSeconds: license.revalidationIntervalSeconds,
+  offlineGraceSeconds: license.offlineGraceSeconds,
+  features: license.features
+});
 
 exports.createRequest = asyncHandler(async (req, res) => {
   const normalizedDeviceId = req.body.deviceId.trim();
@@ -80,21 +92,41 @@ exports.activate = asyncHandler(async (req, res) => {
     });
 
     res.status(201).json(buildSuccessResponse({
-      license: {
-        id: result.license._id,
-        code: result.license.code,
-        type: result.license.type,
-        status: result.license.status,
-        expiresAt: result.license.expiresAt,
-        revalidationIntervalSeconds: result.license.revalidationIntervalSeconds,
-        offlineGraceSeconds: result.license.offlineGraceSeconds,
-        features: result.license.features
-      },
+      license: buildLicensePayload(result.license),
       token: result.token.token,
       tokenHeader: result.token.tokenHeader,
       claims: result.token.license
     }, {
       message: 'License activated successfully'
+    }));
+  } catch (error) {
+    return sendServiceError(res, error);
+  }
+});
+
+exports.getDeviceActivationStatus = asyncHandler(async (req, res) => {
+  try {
+    const result = await getDeviceActivationStatus({
+      deviceId: req.query.deviceId,
+      req
+    });
+
+    if (!result.activated) {
+      return res.json(buildSuccessResponse({
+        status: result.status || 'not_activated'
+      }, {
+        activated: false
+      }));
+    }
+
+    res.json(buildSuccessResponse({
+      status: result.status,
+      token: result.token.token,
+      license: buildLicensePayload(result.license),
+      claims: result.token.license,
+      tokenHeader: result.token.tokenHeader
+    }, {
+      activated: true
     }));
   } catch (error) {
     return sendServiceError(res, error);
