@@ -17,6 +17,7 @@ const {
 router.post('/request', validateActivationRequest, activationController.createRequest);
 router.get('/request/:requestId', validateActivationRequestStatus, activationController.getRequestStatus);
 router.post('/', activationRateLimit, validateActivation, activationController.activate);
+router.post('/device/status', validateLicenseCheckDevice, activationController.getDeviceActivationStatus);
 router.post('/license/validate', revalidationRateLimit, validateLicenseValidate, activationController.validateLicense);
 router.post('/license/revalidate', revalidationRateLimit, validateLicenseValidate, activationController.revalidateLicense);
 router.post('/license/status', failedValidationRateLimit, validateLicenseCheckDevice, activationController.getLicenseStatus);
