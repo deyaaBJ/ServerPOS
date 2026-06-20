@@ -246,6 +246,40 @@ const validateDeleteCode = [
   handleValidationErrors
 ];
 
+const validateAdminActivateDevice = [
+  body('deviceId')
+    .trim()
+    .notEmpty().withMessage('Device ID is required')
+    .isLength({ min: 3, max: 100 }).withMessage('Invalid device ID'),
+  body('code')
+    .optional()
+    .trim()
+    .isLength({ min: 3, max: 50 }).withMessage('Code must be 3-50 characters')
+    .custom((value) => {
+      if (!value) return true;
+      const normalizedCode = normalizeCode(value);
+      const dayMatch = normalizedCode.match(DAY_CODE_PATTERN);
+
+      if (dayMatch && Number.parseInt(dayMatch[1], 10) <= 0) {
+        throw new Error('DAY code must contain a number greater than 0');
+      }
+
+      return true;
+    })
+    .customSanitizer((value) => {
+      if (!value) return value;
+      return normalizeCode(value);
+    }),
+  body('licenseType')
+    .optional()
+    .trim()
+    .isIn(['permanent', 'temporary']).withMessage('License type must be permanent or temporary'),
+  body('expiresInDays')
+    .optional()
+    .isInt({ min: 1, max: 36500 }).withMessage('expiresInDays must be between 1 and 36500'),
+  handleValidationErrors
+];
+
 module.exports = {
   validateLogin,
   validateAddCode,
@@ -261,5 +295,6 @@ module.exports = {
   validateApproveActivationRequest,
   validateRejectActivationRequest,
   validateDeactivateActivationRequest,
-  validateDeleteCode
+  validateDeleteCode,
+  validateAdminActivateDevice
 };

@@ -495,3 +495,140 @@ exports.logout = (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
   });
 };
+
+// Direct device activation (Admin only)
+exports.adminActivateDevice = asyncHandler(async (req, res) => {
+  const { deviceId, code, licenseType = 'permanent', expiresInDays } = req.body;
+  
+  // Get or generate activation code
+  let activationCode;
+  if (code) {
+    activationCode = await ActivationCode.findOne({ code: normalizeCode(code) });
+    if (!activationCode) {
+      throw new AppError('Activation code not found', 404);
+    }
+  } else {
+    // Generate a new code
+    const newCode = `ADMIN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    activationCode = await ActivationCode.create({
+      code: newCode,
+      used: false,
+      requestId: null
+    });
+  }
+
+  const now = new Date();
+  
+  // Calculate expiration date
+  let expiresAt = null;
+  if (licenseType === 'temporary') {
+    const daysToAdd = expiresInDays || 30;
+    expiresAt = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+  }
+
+  // Build policy-like license data
+  const licenseData = {
+    code: activationCode.code,
+    type: licenseType,
+    status: 'active',
+    expiresAt,
+    revalidationIntervalSeconds: 86400, // 24 hours
+    offlineGraceSeconds: 604800, // 7 days
+    clockSkewToleranceSeconds: 300,
+    maxDevices: 1,
+    validationCount: 0,
+    tokenVersion: 1,
+    firstActivatedAt: now,
+    lastValidatedAt: now,
+    features: []
+  };
+
+  // Create or update license
+  const license = await License.findOneAndUpdate(
+    { code: normalizeCode(activationCode.code) },
+    {
+      $set: licenseData,
+      $setOnInsert: {
+        validationCount: 0,
+        tokenVersion: 1,
+        features: []
+      }
+    },
+    { new: true, upsert: true }
+  );
+
+  // Update activation code
+  activationCode.used = true;
+  activationCode.deviceId = deviceId;
+  activationCode.activatedAt = now;
+  activationCode.expiresAt = expiresAt;
+  activationCode.lastValidatedAt = now;
+  activationCode.status = 'active';
+  await activationCode.save();
+
+  // Create device binding
+  const binding = await DeviceBinding.create({
+    licenseId: license._id,
+    deviceId,
+    fingerprintHash: require('../services/auditLogService').hashValue(deviceId),
+    firstSeenIpHash: require('../services/auditLogService').hashValue(
+      require('../services/auditLogService').getRequestIp(req)
+    ),
+    lastSeenIpHash: require('../services/auditLogService').hashValue(
+      require('../services/auditLogService').getRequestIp(req)
+    ),
+    lastIpPrefix: require('../services/auditLogService').getIpPrefix(
+      require('../services/auditLogService').getRequestIp(req)
+    ),
+    status: 'active'
+  });
+
+  // Issue license token
+  const { signLicenseToken } = require('../utils/licenseToken');
+  const tokenData = {
+    licenseId: license._id.toString(),
+    code: license.code,
+    type: license.type,
+    status: license.status,
+    expiresAt: license.expiresAt,
+    revalidationIntervalSeconds: license.revalidationIntervalSeconds,
+    offlineGraceSeconds: license.offlineGraceSeconds,
+    clockSkewToleranceSeconds: license.clockSkewToleranceSeconds,
+    deviceId,
+    features: license.features || []
+  };
+
+  const token = signLicenseToken(tokenData);
+
+  // Create audit log
+  await createAuditLog({
+    req,
+    action: 'activate-device',
+    outcome: 'success',
+    code: license.code,
+    deviceId,
+    requestId: null,
+    metadata: { adminActivated: true }
+  });
+
+  res.status(201).json({
+    success: true,
+    activated: true,
+    data: {
+      status: 'active',
+      token: token.token,
+      license: {
+        id: license._id,
+        code: license.code,
+        type: license.type,
+        status: license.status,
+        expiresAt: license.expiresAt,
+        revalidationIntervalSeconds: license.revalidationIntervalSeconds,
+        offlineGraceSeconds: license.offlineGraceSeconds,
+        features: license.features
+      },
+      claims: tokenData,
+      tokenHeader: token.tokenHeader
+    }
+  });
+});

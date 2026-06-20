@@ -9,13 +9,20 @@ const {
   validateApproveActivationRequest,
   validateRejectActivationRequest,
   validateDeactivateActivationRequest,
-  validateLicenseRevoke
+  validateLicenseRevoke,
+  validateAdminActivateDevice
 } = require('../middleware/validator');
 
 router.post('/login', validateLogin, adminController.login);
 router.post('/change-password', adminOnly, validateChangePassword, adminController.changePassword);
 router.get('/stats', adminOnly, adminController.getStats);
 router.get('/activation-requests', adminOnly, adminController.getActivationRequests);
+router.post(
+  '/activate-device',
+  adminOnly,
+  validateAdminActivateDevice,
+  adminController.adminActivateDevice
+);
 router.post(
   '/activation-requests/:requestId/approve',
   adminOnly,
