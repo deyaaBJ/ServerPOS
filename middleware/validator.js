@@ -210,6 +210,14 @@ const validateApproveActivationRequest = [
       return true;
     })
     .customSanitizer(normalizeCode),
+  body('clientName')
+    .trim()
+    .notEmpty().withMessage('Client name is required')
+    .isLength({ min: 1, max: 120 }).withMessage('Client name must be 1-120 characters'),
+  body('clientPhone')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isLength({ max: 40 }).withMessage('Client phone cannot exceed 40 characters'),
   handleValidationErrors
 ];
 

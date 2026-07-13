@@ -6,7 +6,8 @@ const { normalizeCode } = require('../utils/code');
 exports.getAllCodes = asyncHandler(async (req, res) => {
   const codes = await ActivationCode.find()
     .sort({ createdAt: -1 })
-    .select('-__v');
+    .select('-__v')
+    .populate('requestId', 'clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt');
 
   res.json({
     success: true,
@@ -80,6 +81,6 @@ exports.getCodeDetails = asyncHandler(async (req, res) => {
 
   res.json({
     success: true,
-    code: codeEntry
+    code: await codeEntry.populate('requestId', 'clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
   });
 });

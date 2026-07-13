@@ -17,6 +17,18 @@ const activationRequestSchema = new mongoose.Schema({
     uppercase: true,
     trim: true
   },
+  clientName: {
+    type: String,
+    default: null,
+    trim: true,
+    maxlength: [120, 'Client name cannot exceed 120 characters']
+  },
+  clientPhone: {
+    type: String,
+    default: null,
+    trim: true,
+    maxlength: [40, 'Client phone cannot exceed 40 characters']
+  },
   approvedAt: {
     type: Date,
     default: null
@@ -56,6 +68,7 @@ const activationRequestSchema = new mongoose.Schema({
 });
 
 activationRequestSchema.index({ deviceId: 1, status: 1 });
+activationRequestSchema.index({ clientName: 1, status: 1 });
 
 activationRequestSchema.pre('save', function() {
   this.updatedAt = new Date();

@@ -4,6 +4,8 @@ const ActivationRequest = require('../models/ActivationRequest');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const { isCodeExpired, normalizeCode } = require('../utils/code');
 
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const refreshExpiredRequestState = async (request) => {
   if (!request?.assignedCode || !request?.completedAt) {
     return request;
@@ -34,6 +36,8 @@ const refreshExpiredRequestState = async (request) => {
 
   request.status = 'pending';
   request.assignedCode = null;
+  request.clientName = null;
+  request.clientPhone = null;
   request.completedAt = null;
   request.approvedAt = null;
   request.rejectedAt = null;
@@ -320,6 +324,8 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
 exports.approveActivationRequest = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
   const normalizedCode = normalizeCode(req.body.code);
+  const clientName = req.body.clientName?.trim();
+  const clientPhone = req.body.clientPhone?.trim() || null;
   const request = await ActivationRequest.findById(requestId);
 
   if (!request) {
@@ -330,6 +336,21 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
 
   if (request.status === 'completed') {
     throw new AppError('Activation request is already completed', 400);
+  }
+
+  if (!clientName) {
+    throw new AppError('Client name is required', 400);
+  }
+
+  const duplicateClient = await ActivationRequest.findOne({
+    _id: { $ne: request._id },
+    isArchived: { $ne: true },
+    status: { $in: ['approved', 'completed'] },
+    clientName: { $regex: `^${escapeRegExp(clientName)}$`, $options: 'i' }
+  }).select('_id clientName assignedCode');
+
+  if (duplicateClient) {
+    throw new AppError('Client name already exists. Use a unique client name.', 409);
   }
 
   const approvedAt = new Date();
@@ -362,6 +383,8 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
 
   request.status = 'approved';
   request.assignedCode = normalizedCode;
+  request.clientName = clientName;
+  request.clientPhone = clientPhone;
   request.approvedAt = approvedAt;
   request.completedAt = null;
   request.rejectedAt = null;
@@ -398,6 +421,8 @@ exports.rejectActivationRequest = asyncHandler(async (req, res) => {
 
   request.status = 'rejected';
   request.assignedCode = null;
+  request.clientName = null;
+  request.clientPhone = null;
   request.approvedAt = null;
   request.rejectedAt = new Date();
   request.rejectionReason = reason;
@@ -443,6 +468,8 @@ exports.deactivateActivationRequest = asyncHandler(async (req, res) => {
 
   request.status = 'deactivated';
   request.assignedCode = null;
+  request.clientName = null;
+  request.clientPhone = null;
   request.approvedAt = null;
   request.completedAt = null;
   request.rejectedAt = new Date();
