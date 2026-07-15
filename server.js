@@ -108,26 +108,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// ─────────────────────────────────────────────
-// [FIX 5] Request Timeout
-// أي طلب ما انكمل بـ 30 ثانية بيتقطع - يحمي من hanging requests
-// ─────────────────────────────────────────────
-app.use((req, res, next) => {
-  req.setTimeout(30000, () => {
-    res.status(408).json({
-      success: false,
-      message: 'Request timeout'
-    });
-  });
-  next();
-});
-
-// ─────────────────────────────────────────────
-// [IMPROVED] Rate limiting بالدقيقة بدل 15 دقيقة
-// + إضافة standardHeaders وlegacyHeaders
-// + rate limiter منفصل لـ activation endpoint
-// ─────────────────────────────────────────────
-
 // عام - 30 request/دقيقة لكل IP
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
