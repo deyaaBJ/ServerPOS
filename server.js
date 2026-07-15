@@ -33,7 +33,7 @@ for (const key of REQUIRED_ENV) {
 }
 
 if (!process.env.RSA_PRIVATE_KEY && !process.env.RSA_PRIVATE_KEY_PATH) {
-  console.error('âŒ Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
+  console.error('âŒ Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
   process.exit(1);
 }
 
@@ -164,13 +164,27 @@ app.use('/api/activate/license', licenseLimiter);
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// ─────────────────────────────────────────────
+// Health check - لازم يكون هون، قبل الـ session
+// حتى ما يعلق بانتظار الاتصال بقاعدة البيانات
+// ─────────────────────────────────────────────
+app.get('/api/health', async (req, res) => {
+  const mongoose = require('mongoose');
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Session configuration
 const sessionConfig = {
   name: 'motamayez.sid',
   secret: process.env.SESSION_SECRET, // [FIX 1] مضمون إنه موجود من التحقق فوق
   resave: false,
   saveUninitialized: false,
-store: MongoStore.create({
+  store: MongoStore.create({
     mongoUrl: process.env.MONGODB_URI,
     collectionName: 'sessions',
     ttl: 24 * 60 * 60,
@@ -214,17 +228,6 @@ app.get('/api/activate/public-key', (req, res) => {
     success: true,
     algorithm: 'RSA-SHA256',
     publicKey
-  });
-});
-
-// Health check
-app.get('/api/health', async (req, res) => {
-  const mongoose = require('mongoose');
-  res.json({
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    environment: process.env.NODE_ENV || 'development'
   });
 });
 
