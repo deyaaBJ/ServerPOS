@@ -6,6 +6,7 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
+const serverless = require('serverless-http');
 
 const connectDB = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -243,6 +244,34 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+let initializationPromise = null;
+
+const initializeApp = async () => {
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  initializationPromise = (async () => {
+    await connectDB();
+    await Admin.initializeDefault();
+  })();
+
+  return initializationPromise;
+};
+
+app.use(async (req, res, next) => {
+  if (req.path === '/api/health') {
+    return next();
+  }
+
+  try {
+    await initializeApp();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Serve admin panel
 app.get(['/', '/admin'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -264,21 +293,23 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
-    await connectDB();
-    await Admin.initializeDefault();
+    await initializeApp();
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
-    
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
   }
 };
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = serverless(app);
 
 // Handle unhandled rejections
 process.on('unhandledRejection', (err) => {
