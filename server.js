@@ -55,17 +55,27 @@ console.log('[T2] env vars validated');
 app.set('trust proxy', 1);
 
 // ─────────────────────────────────────────────
+// [DEBUG] تتبع كل طلب داخل - أول شي بيصير
+// ─────────────────────────────────────────────
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.path} | secure=${req.secure} | x-forwarded-proto=${req.headers['x-forwarded-proto']}`);
+  next();
+});
+
+// ─────────────────────────────────────────────
 // [FIX 2] HTTPS redirect في production
 // كل طلب HTTP بيتحوّل تلقائياً لـ HTTPS
 // ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
     if (!req.secure && req.headers['x-forwarded-proto'] !== 'https') {
+      console.log(`[REDIRECT] would redirect ${req.path} to https - this may be a loop!`);
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
     }
     next();
   });
 }
+
 
 // ─────────────────────────────────────────────
 // [FIX 3] Helmet مع CSP بدون unsafe-inline
