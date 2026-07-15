@@ -1,3 +1,5 @@
+deyaa@DEYAA_BJ MINGW64 /e/motamayez-server (main)
+$ cat config/database.js
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
