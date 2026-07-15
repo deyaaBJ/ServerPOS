@@ -170,12 +170,16 @@ const sessionConfig = {
   secret: process.env.SESSION_SECRET, // [FIX 1] مضمون إنه موجود من التحقق فوق
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({
+store: MongoStore.create({
     mongoUrl: process.env.MONGODB_URI,
     collectionName: 'sessions',
     ttl: 24 * 60 * 60,
     autoRemove: 'native',
-    touchAfter: 24 * 3600
+    touchAfter: 24 * 3600,
+    mongoOptions: {
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
+    }
   }),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
