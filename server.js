@@ -1,7 +1,11 @@
+console.log('[T0] file starting - about to require modules');
 require('dotenv').config();
 const express = require('express');
+console.log('[T0b] express required');
 const session = require('express-session');
+console.log('[T0c] express-session required');
 const MongoStore = require('connect-mongo');
+console.log('[T0d] connect-mongo required');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -10,16 +14,23 @@ const serverless = require('serverless-http');
 
 const connectDB = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
+console.log('[T0e] about to require Admin model');
 const Admin = require('./models/Admin');
+console.log('[T0f] Admin model required');
 const { getConfiguredPublicKey } = require('./utils/activationSignature');
 
 // Import routes
+console.log('[T0g] about to require route files');
 const adminRoutes = require('./routes/admin');
+console.log('[T0h] admin routes required');
 const codeRoutes = require('./routes/codes');
+console.log('[T0i] code routes required');
 const activationRoutes = require('./routes/activation');
+console.log('[T0j] activation routes required - all requires done');
 
 
 const app = express();
+console.log('[T1] express app created');
 
 
 // ─────────────────────────────────────────────
@@ -36,6 +47,8 @@ for (const key of REQUIRED_ENV) {
 if (!process.env.RSA_PRIVATE_KEY && !process.env.RSA_PRIVATE_KEY_PATH) {
   throw new Error('Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
 }
+
+console.log('[T2] env vars validated');
 
 
 // Trust proxy for Render
@@ -83,6 +96,7 @@ app.use(helmet({
   }
 }));
 
+console.log('[T3] helmet configured');
 
 // ─────────────────────────────────────────────
 // [FIX 4] CORS - يرمي error لو ALLOWED_ORIGINS مش معرّف في production
@@ -108,6 +122,8 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
+
+console.log('[T4] cors configured, allowedOrigins=', allowedOrigins);
 
 
 // عام - 30 request/دقيقة لكل IP
@@ -162,15 +178,14 @@ const licenseLimiter = rateLimit({
 });
 app.use('/api/activate/license', licenseLimiter);
 
-// Body parsing
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+console.log('[T4b] body parsers attached, about to define /api/health route');
 
 // ─────────────────────────────────────────────
 // Health check - لازم يكون هون، قبل الـ session
 // حتى ما يعلق بانتظار الاتصال بقاعدة البيانات
 // ─────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
+  console.log('[T5] /api/health handler invoked');
   const mongoose = require('mongoose');
   res.json({
     status: 'OK',
@@ -178,8 +193,10 @@ app.get('/api/health', async (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     environment: process.env.NODE_ENV || 'development'
   });
+  console.log('[T6] /api/health response sent');
 });
 
+console.log('[T5b] /api/health route defined, about to call MongoStore.create');
 
 // Session configuration
 const sessionConfig = {
@@ -207,9 +224,11 @@ const sessionConfig = {
   }
 };
 
+console.log('[T5c] MongoStore.create returned, sessionConfig built');
 
 app.use(session(sessionConfig));
 
+console.log('[T7] session middleware attached');
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -302,6 +321,7 @@ if (require.main === module) {
 }
 
 
+console.log('[T8] module fully loaded, exporting handler now');
 module.exports = serverless(app);
 
 // Handle unhandled rejections
