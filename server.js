@@ -18,11 +18,9 @@ const adminRoutes = require('./routes/admin');
 const codeRoutes = require('./routes/codes');
 const activationRoutes = require('./routes/activation');
 
-console.log('[TRACE 0] module loading started');
 
 const app = express();
 
-console.log('[TRACE 1] express app created');
 
 // ─────────────────────────────────────────────
 // [FIX 1] التحقق من المتغيرات الإلزامية عند البدء
@@ -31,17 +29,14 @@ console.log('[TRACE 1] express app created');
 const REQUIRED_ENV = ['SESSION_SECRET', 'MONGODB_URI'];
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
-    console.error(`❌ Missing required environment variable: ${key}`);
-    process.exit(1);
+    throw new Error(`Missing required environment variable: ${key}`);
   }
 }
 
 if (!process.env.RSA_PRIVATE_KEY && !process.env.RSA_PRIVATE_KEY_PATH) {
-  console.error('âŒ Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
-  process.exit(1);
+  throw new Error('Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
 }
 
-console.log('[TRACE 2] env vars validated');
 
 // Trust proxy for Render
 app.set('trust proxy', 1);
@@ -88,7 +83,6 @@ app.use(helmet({
   }
 }));
 
-console.log('[TRACE 3] helmet configured');
 
 // ─────────────────────────────────────────────
 // [FIX 4] CORS - يرمي error لو ALLOWED_ORIGINS مش معرّف في production
@@ -97,8 +91,7 @@ console.log('[TRACE 3] helmet configured');
 let allowedOrigins;
 if (process.env.NODE_ENV === 'production') {
   if (!process.env.ALLOWED_ORIGINS) {
-    console.error('❌ ALLOWED_ORIGINS must be set in production');
-    process.exit(1);
+    throw new Error('ALLOWED_ORIGINS must be set in production');
   }
   allowedOrigins = process.env.ALLOWED_ORIGINS.split(',');
 } else {
@@ -116,7 +109,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-console.log('[TRACE 4] cors configured');
 
 // عام - 30 request/دقيقة لكل IP
 const limiter = rateLimit({
@@ -179,7 +171,6 @@ app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 // حتى ما يعلق بانتظار الاتصال بقاعدة البيانات
 // ─────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
-  console.log('[TRACE 5] /api/health handler invoked');
   const mongoose = require('mongoose');
   res.json({
     status: 'OK',
@@ -187,10 +178,8 @@ app.get('/api/health', async (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     environment: process.env.NODE_ENV || 'development'
   });
-  console.log('[TRACE 6] /api/health response sent');
 });
 
-console.log('[TRACE 5b] about to build sessionConfig (MongoStore.create runs here)');
 
 // Session configuration
 const sessionConfig = {
@@ -218,11 +207,9 @@ const sessionConfig = {
   }
 };
 
-console.log('[TRACE 5c] sessionConfig built (MongoStore.create returned)');
 
 app.use(session(sessionConfig));
 
-console.log('[TRACE 7] session middleware attached');
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -314,13 +301,12 @@ if (require.main === module) {
   startServer();
 }
 
-console.log('[TRACE 8] module fully loaded, exporting handler');
 
 module.exports = serverless(app);
 
 // Handle unhandled rejections
+// [FIX] على serverless ما منقتل الـ process لأي unhandled rejection
+// لأنو هاد ممكن يوقف باقي الطلبات الشغالة بنفس الـ container بدون داعي
 process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
-  process.exit(1);
+  console.error('UNHANDLED REJECTION:', err.name, err.message);
 });
