@@ -303,6 +303,21 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 3000;
 
+// Initialize application resources (DB, default admin)
+const initializeApp = async () => {
+  if (isDBReady) return;
+  try {
+    console.log('🔄 initializeApp: connecting to database...');
+    await connectDB();
+    await Admin.initializeDefault();
+    isDBReady = true;
+    console.log('✅ initializeApp: database ready');
+  } catch (err) {
+    console.error('❌ initializeApp error:', err);
+    throw err;
+  }
+};
+
 const startServer = async () => {
   try {
     await initializeApp();
