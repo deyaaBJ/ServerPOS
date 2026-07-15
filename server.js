@@ -66,16 +66,6 @@ app.use((req, res, next) => {
 // [FIX 2] HTTPS redirect في production
 // كل طلب HTTP بيتحوّل تلقائياً لـ HTTPS
 // ─────────────────────────────────────────────
-if (process.env.NODE_ENV === 'production') {
-  app.use((req, res, next) => {
-    if (!req.secure && req.headers['x-forwarded-proto'] !== 'https') {
-      console.log(`[REDIRECT] would redirect ${req.path} to https - this may be a loop!`);
-      return res.redirect(301, `https://${req.headers.host}${req.url}`);
-    }
-    next();
-  });
-}
-
 
 // ─────────────────────────────────────────────
 // [FIX 3] Helmet مع CSP بدون unsafe-inline
@@ -264,33 +254,34 @@ app.get('/api/activate/public-key', (req, res) => {
     publicKey
   });
 });
-
-let initializationPromise = null;
-
-const initializeApp = async () => {
-  if (initializationPromise) {
-    return initializationPromise;
-  }
-
-  initializationPromise = (async () => {
-    await connectDB();
-    await Admin.initializeDefault();
-  })();
-
-  return initializationPromise;
-};
+// ✅ هذا الكود الجديد بدل القديم (اتصال آمن بدون تعليق)
+let isDBReady = false;
 
 app.use(async (req, res, next) => {
+  // مسار الصحة ما يحتاج قاعدة بيانات، خلّه يمر بسرعة
   if (req.path === '/api/health') {
     return next();
   }
 
-  try {
-    await initializeApp();
-    next();
-  } catch (error) {
-    next(error);
+  // إذا قاعدة البيانات مو جاهزة، نبدأ الاتصال (مرة وحدة فقط)
+  if (!isDBReady) {
+    try {
+      console.log('🔄 جاري الاتصال بقاعدة البيانات...');
+      await connectDB();
+      await Admin.initializeDefault();
+      isDBReady = true;
+      console.log('✅ قاعدة البيانات جاهزة');
+    } catch (error) {
+      console.error('❌ فشل الاتصال بقاعدة البيانات:', error);
+      // هنا الفرق الأهم: نرجع خطأ للمتصفح بدل ما نعلق (نخليه ينتظر للأبد)
+      return res.status(503).json({
+        success: false,
+        message: 'قاعدة البيانات غير متاحة حالياً، حاول مرة أخرى'
+      });
+    }
   }
+
+  next();
 });
 
 // Serve admin panel
