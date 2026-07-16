@@ -259,31 +259,45 @@ app.get('/api/activate/public-key', (req, res) => {
     publicKey
   });
 });
-// ✅ هذا الكود الجديد بدل القديم (اتصال آمن بدون تعليق)
+// ✅ تأخير الاتصال بقاعدة البيانات لطلبات الصفحات العامة حتى لا تعطل الصفحة الرئيسية
 let isDBReady = false;
+let initPromise = null;
 
-app.use(async (req, res, next) => {
-  // مسار الصحة ما يحتاج قاعدة بيانات، خلّه يمر بسرعة
-  if (req.path === '/api/health') {
-    return next();
-  }
+const ensureDatabaseReady = async () => {
+  if (isDBReady) return;
 
-  // إذا قاعدة البيانات مو جاهزة، نبدأ الاتصال (مرة وحدة فقط)
-  if (!isDBReady) {
-    try {
+  if (!initPromise) {
+    initPromise = (async () => {
       console.log('🔄 جاري الاتصال بقاعدة البيانات...');
       await connectDB();
       await Admin.initializeDefault();
       isDBReady = true;
       console.log('✅ قاعدة البيانات جاهزة');
-    } catch (error) {
-      console.error('❌ فشل الاتصال بقاعدة البيانات:', error);
-      // هنا الفرق الأهم: نرجع خطأ للمتصفح بدل ما نعلق (نخليه ينتظر للأبد)
-      return res.status(503).json({
-        success: false,
-        message: 'قاعدة البيانات غير متاحة حالياً، حاول مرة أخرى'
-      });
-    }
+    })().catch((error) => {
+      initPromise = null;
+      throw error;
+    });
+  }
+
+  return initPromise;
+};
+
+app.use(async (req, res, next) => {
+  const isPublicPage = req.path === '/' || req.path === '/admin' || req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path === '/favicon.ico';
+
+  // مسارات الصحة والصفحات العامة لا تحتاج انتظار قاعدة البيانات
+  if (req.path === '/api/health' || isPublicPage) {
+    return next();
+  }
+
+  try {
+    await ensureDatabaseReady();
+  } catch (error) {
+    console.error('❌ فشل الاتصال بقاعدة البيانات:', error);
+    return res.status(503).json({
+      success: false,
+      message: 'قاعدة البيانات غير متاحة حالياً، حاول مرة أخرى'
+    });
   }
 
   next();
@@ -310,12 +324,9 @@ const PORT = process.env.PORT || 3000;
 
 // Initialize application resources (DB, default admin)
 const initializeApp = async () => {
-  if (isDBReady) return;
   try {
     console.log('🔄 initializeApp: connecting to database...');
-    await connectDB();
-    await Admin.initializeDefault();
-    isDBReady = true;
+    await ensureDatabaseReady();
     console.log('✅ initializeApp: database ready');
   } catch (err) {
     console.error('❌ initializeApp error:', err);
