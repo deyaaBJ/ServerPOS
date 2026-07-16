@@ -201,45 +201,55 @@ app.get('/api/health', async (req, res) => {
 
 console.log('[T5b] /api/health route defined, about to call MongoStore.create');
 
-// Session configuration
-const sessionConfig = {
-  name: 'motamayez.sid',
-  secret: process.env.SESSION_SECRET, // [FIX 1] مضمون إنه موجود من التحقق فوق
-  resave: false,
-  saveUninitialized: false,
-store: MongoStore.create({
-  mongoUrl: process.env.MONGODB_URI,
-  collectionName: 'sessions',
-  ttl: 24 * 60 * 60,
-  autoRemove: 'native',
-  // touchAfter: 24 * 3600,
-  mongoOptions: {
-    family: 4, // 🔥 هذا هو الحل السحري لـ Vercel مع MongoDB Atlas
-    serverSelectionTimeoutMS: 1000, // ثانية واحدة فقط
-    connectTimeoutMS: 1000,
-    socketTimeoutMS: 1000,
+// Session configuration (lazy-loaded for admin routes only so public pages do not hang on Vercel)
+const createAdminSessionMiddleware = () => {
+  const sessionConfig = {
+    name: 'motamayez.sid',
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/'
+    }
+  };
+
+  if (process.env.MONGODB_URI) {
+    sessionConfig.store = MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60,
+      autoRemove: 'native',
+      mongoOptions: {
+        family: 4,
+        serverSelectionTimeoutMS: 1000,
+        connectTimeoutMS: 1000,
+        socketTimeoutMS: 1000,
+      }
+    });
   }
-}),
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000,
-    path: '/'
-  }
+
+  return session(sessionConfig);
 };
 
-console.log('[T5c] MongoStore.create returned, sessionConfig built');
+const ensureAdminSessionMiddleware = (req, res, next) => {
+  if (!req.app.locals.adminSessionMiddleware) {
+    req.app.locals.adminSessionMiddleware = createAdminSessionMiddleware();
+  }
 
-app.use(session(sessionConfig));
+  req.app.locals.adminSessionMiddleware(req, res, next);
+};
 
-console.log('[T7] session middleware attached');
+console.log('[T7] admin session middleware prepared');
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', ensureAdminSessionMiddleware, adminRoutes);
 app.use('/api/codes', codeRoutes);
 app.use('/api/activate', activationRoutes);
 
