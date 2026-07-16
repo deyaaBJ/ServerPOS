@@ -4,8 +4,6 @@ const express = require('express');
 console.log('[T0b] express required');
 const session = require('express-session');
 console.log('[T0c] express-session required');
-const MongoStore = require('connect-mongo');
-console.log('[T0d] connect-mongo required');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -37,15 +35,15 @@ console.log('[T1] express app created');
 // [FIX 1] التحقق من المتغيرات الإلزامية عند البدء
 // بدل ما السيرفر يشتغل بـ undefined هلق بيرمي error واضح
 // ─────────────────────────────────────────────
-const REQUIRED_ENV = ['SESSION_SECRET', 'MONGODB_URI'];
+const REQUIRED_ENV = ['SESSION_SECRET'];
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
-    throw new Error(`Missing required environment variable: ${key}`);
+    console.warn(`[WARN] Missing environment variable: ${key}`);
   }
 }
 
 if (!process.env.RSA_PRIVATE_KEY && !process.env.RSA_PRIVATE_KEY_PATH) {
-  throw new Error('Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
+  console.warn('[WARN] RSA private key is not configured. Activation routes may fail until it is set.');
 }
 
 console.log('[T2] env vars validated');
@@ -217,20 +215,7 @@ const createAdminSessionMiddleware = () => {
     }
   };
 
-  if (process.env.MONGODB_URI) {
-    sessionConfig.store = MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
-      collectionName: 'sessions',
-      ttl: 24 * 60 * 60,
-      autoRemove: 'native',
-      mongoOptions: {
-        family: 4,
-        serverSelectionTimeoutMS: 1000,
-        connectTimeoutMS: 1000,
-        socketTimeoutMS: 1000,
-      }
-    });
-  }
+  sessionConfig.store = new session.MemoryStore();
 
   return session(sessionConfig);
 };
