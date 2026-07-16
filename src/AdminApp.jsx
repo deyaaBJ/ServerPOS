@@ -558,8 +558,13 @@ function App() {
   const [loggedIn, setLoggedIn] = useState(false);
 
   const verifySession = async () => {
-    await request('/admin/stats');
-    setLoggedIn(true);
+    try {
+      await request('/admin/stats');
+      setLoggedIn(true);
+    } catch (error) {
+      setLoggedIn(false);
+      throw error;
+    }
   };
 
   useEffect(() => {

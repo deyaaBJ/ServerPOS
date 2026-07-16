@@ -282,11 +282,10 @@ const ensureDatabaseReady = async () => {
   return initPromise;
 };
 
-app.use(async (req, res, next) => {
-  const isPublicPage = req.path === '/' || req.path === '/admin' || req.path.startsWith('/css/') || req.path.startsWith('/js/') || req.path === '/favicon.ico';
+const { shouldWaitForDatabase } = require('./utils/requestAccess');
 
-  // مسارات الصحة والصفحات العامة لا تحتاج انتظار قاعدة البيانات
-  if (req.path === '/api/health' || isPublicPage) {
+app.use(async (req, res, next) => {
+  if (!shouldWaitForDatabase(req)) {
     return next();
   }
 
