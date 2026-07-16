@@ -2,3 +2,5 @@
 .private.pem
 .public.pem
 node_modules/
+.vercel
+.env*
