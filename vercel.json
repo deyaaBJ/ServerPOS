@@ -8,12 +8,20 @@
     {
       "src": "api/ping.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/db-test.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/api/ping",
       "dest": "api/ping.js"
+    },
+    {
+      "src": "/api/db-test",
+      "dest": "api/db-test.js"
     },
     {
       "src": "/(.*)",
