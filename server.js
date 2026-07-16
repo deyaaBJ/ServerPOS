@@ -207,19 +207,19 @@ const sessionConfig = {
   secret: process.env.SESSION_SECRET, // [FIX 1] مضمون إنه موجود من التحقق فوق
   resave: false,
   saveUninitialized: false,
-// store: MongoStore.create({
-//   mongoUrl: process.env.MONGODB_URI,
-//   collectionName: 'sessions',
-//   ttl: 24 * 60 * 60,
-//   autoRemove: 'native',
-//   touchAfter: 24 * 3600,
-//   mongoOptions: {
-//     family: 4, // 🔥 هذا هو الحل السحري لـ Vercel مع MongoDB Atlas
-//     serverSelectionTimeoutMS: 1000, // ثانية واحدة فقط
-//     connectTimeoutMS: 1000,
-//     socketTimeoutMS: 1000,
-//   }
-// }),
+store: MongoStore.create({
+  mongoUrl: process.env.MONGODB_URI,
+  collectionName: 'sessions',
+  ttl: 24 * 60 * 60,
+  autoRemove: 'native',
+  // touchAfter: 24 * 3600,
+  mongoOptions: {
+    family: 4, // 🔥 هذا هو الحل السحري لـ Vercel مع MongoDB Atlas
+    serverSelectionTimeoutMS: 1000, // ثانية واحدة فقط
+    connectTimeoutMS: 1000,
+    socketTimeoutMS: 1000,
+  }
+}),
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
