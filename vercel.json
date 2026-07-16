@@ -4,9 +4,17 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/ping.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/ping",
+      "dest": "api/ping.js"
+    },
     {
       "src": "/(.*)",
       "dest": "server.js"
