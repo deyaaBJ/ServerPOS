@@ -4,6 +4,8 @@ const express = require('express');
 console.log('[T0b] express required');
 const session = require('express-session');
 console.log('[T0c] express-session required');
+const MongoStore = require('connect-mongo');
+console.log('[T0d] connect-mongo required');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -35,15 +37,15 @@ console.log('[T1] express app created');
 // [FIX 1] التحقق من المتغيرات الإلزامية عند البدء
 // بدل ما السيرفر يشتغل بـ undefined هلق بيرمي error واضح
 // ─────────────────────────────────────────────
-const REQUIRED_ENV = ['SESSION_SECRET'];
+const REQUIRED_ENV = ['SESSION_SECRET', 'MONGODB_URI'];
 for (const key of REQUIRED_ENV) {
   if (!process.env[key]) {
-    console.warn(`[WARN] Missing environment variable: ${key}`);
+    throw new Error(`Missing required environment variable: ${key}`);
   }
 }
 
 if (!process.env.RSA_PRIVATE_KEY && !process.env.RSA_PRIVATE_KEY_PATH) {
-  console.warn('[WARN] RSA private key is not configured. Activation routes may fail until it is set.');
+  throw new Error('Missing RSA private key. Set RSA_PRIVATE_KEY or RSA_PRIVATE_KEY_PATH');
 }
 
 console.log('[T2] env vars validated');
@@ -64,6 +66,16 @@ app.use((req, res, next) => {
 // [FIX 2] HTTPS redirect في production
 // كل طلب HTTP بيتحوّل تلقائياً لـ HTTPS
 // ─────────────────────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (!req.secure && req.headers['x-forwarded-proto'] !== 'https') {
+      console.log(`[REDIRECT] would redirect ${req.path} to https - this may be a loop!`);
+      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    }
+    next();
+  });
+}
+
 
 // ─────────────────────────────────────────────
 // [FIX 3] Helmet مع CSP بدون unsafe-inline
@@ -120,9 +132,6 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 console.log('[T4] cors configured, allowedOrigins=', allowedOrigins);
 
@@ -197,44 +206,64 @@ app.get('/api/health', async (req, res) => {
   console.log('[T6] /api/health response sent');
 });
 
-console.log('[T5b] /api/health route defined, about to call MongoStore.create');
+console.log('[T5b] /api/health route defined, about to build sessionConfig');
 
-// Session configuration (lazy-loaded for admin routes only so public pages do not hang on Vercel)
-const createAdminSessionMiddleware = () => {
-  const sessionConfig = {
-    name: 'motamayez.sid',
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/'
-    }
-  };
+// ─────────────────────────────────────────────
+// [TEST] تبديل بين MongoStore والتخزين الافتراضي بالذاكرة
+// لعزل المشكلة - إذا DISABLE_MONGO_SESSION_STORE=true بفيرسال
+// رح يستخدم MemoryStore بدل الاتصال بقاعدة البيانات
+// ─────────────────────────────────────────────
+const useMongoStore = process.env.DISABLE_MONGO_SESSION_STORE !== 'true';
+console.log('[T5b2] useMongoStore =', useMongoStore);
 
-  sessionConfig.store = new session.MemoryStore();
+const sessionStore = useMongoStore
+  ? MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60,
+      autoRemove: 'native',
+      touchAfter: 24 * 3600,
+      mongoOptions: {
+        serverSelectionTimeoutMS: 8000,
+        connectTimeoutMS: 8000,
+      }
+    })
+  : undefined; // undefined = express-session بيستخدم MemoryStore الافتراضي
 
-  return session(sessionConfig);
-};
+console.log('[T5c] sessionStore built (useMongoStore=' + useMongoStore + ')');
 
-const ensureAdminSessionMiddleware = (req, res, next) => {
-  if (!req.app.locals.adminSessionMiddleware) {
-    req.app.locals.adminSessionMiddleware = createAdminSessionMiddleware();
+// Session configuration
+const sessionConfig = {
+  name: 'motamayez.sid',
+  secret: process.env.SESSION_SECRET, // [FIX 1] مضمون إنه موجود من التحقق فوق
+  resave: false,
+  saveUninitialized: false,
+  store: sessionStore,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 24 * 60 * 60 * 1000,
+    path: '/'
   }
-
-  req.app.locals.adminSessionMiddleware(req, res, next);
 };
 
-console.log('[T7] admin session middleware prepared');
+console.log('[T5d] sessionConfig built');
+
+app.use(session(sessionConfig));
+
+console.log('[T7] session middleware attached');
+
+app.use((req, res, next) => {
+  console.log('[REQ-A] passed session middleware for', req.path);
+  next();
+});
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
-app.use('/api/admin', ensureAdminSessionMiddleware, adminRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/codes', codeRoutes);
 app.use('/api/activate', activationRoutes);
 
@@ -254,51 +283,41 @@ app.get('/api/activate/public-key', (req, res) => {
     publicKey
   });
 });
-// ✅ تأخير الاتصال بقاعدة البيانات لطلبات الصفحات العامة حتى لا تعطل الصفحة الرئيسية
-let isDBReady = false;
-let initPromise = null;
 
-const ensureDatabaseReady = async () => {
-  if (isDBReady) return;
+let initializationPromise = null;
 
-  if (!initPromise) {
-    initPromise = (async () => {
-      console.log('🔄 جاري الاتصال بقاعدة البيانات...');
-      await connectDB();
-      await Admin.initializeDefault();
-      isDBReady = true;
-      console.log('✅ قاعدة البيانات جاهزة');
-    })().catch((error) => {
-      initPromise = null;
-      throw error;
-    });
+const initializeApp = async () => {
+  if (initializationPromise) {
+    return initializationPromise;
   }
 
-  return initPromise;
+  initializationPromise = (async () => {
+    await connectDB();
+    await Admin.initializeDefault();
+  })();
+
+  return initializationPromise;
 };
 
-const { shouldWaitForDatabase } = require('./utils/requestAccess');
-
 app.use(async (req, res, next) => {
-  if (!shouldWaitForDatabase(req)) {
+  if (req.path === '/api/health') {
     return next();
   }
 
+  console.log('[REQ-B] about to call initializeApp for', req.path);
   try {
-    await ensureDatabaseReady();
+    await initializeApp();
+    console.log('[REQ-C] initializeApp resolved for', req.path);
+    next();
   } catch (error) {
-    console.error('❌ فشل الاتصال بقاعدة البيانات:', error);
-    return res.status(503).json({
-      success: false,
-      message: 'قاعدة البيانات غير متاحة حالياً، حاول مرة أخرى'
-    });
+    console.log('[REQ-ERR] initializeApp threw:', error.message);
+    next(error);
   }
-
-  next();
 });
 
 // Serve admin panel
 app.get(['/', '/admin'], (req, res) => {
+  console.log('[REQ-D] serving index.html for', req.path);
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -315,18 +334,6 @@ app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 3000;
-
-// Initialize application resources (DB, default admin)
-const initializeApp = async () => {
-  try {
-    console.log('🔄 initializeApp: connecting to database...');
-    await ensureDatabaseReady();
-    console.log('✅ initializeApp: database ready');
-  } catch (err) {
-    console.error('❌ initializeApp error:', err);
-    throw err;
-  }
-};
 
 const startServer = async () => {
   try {
