@@ -64,13 +64,16 @@ app.use((req, res, next) => {
 
 // ─────────────────────────────────────────────
 // [FIX 2] HTTPS redirect في production
-// كل طلب HTTP بيتحوّل تلقائياً لـ HTTPS
+// في Vercel، Cloudflare، وغيره - بتحضر المرور الآمن تلقائياً
+// لكن بندعم الـ x-forwarded-proto check للـ proxies الذكية
 // ─────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    if (!req.secure && req.headers['x-forwarded-proto'] !== 'https') {
-      console.log(`[REDIRECT] would redirect ${req.path} to https - this may be a loop!`);
-      return res.redirect(301, `https://${req.headers.host}${req.url}`);
+    // فقط check x-forwarded-proto (من reverse proxy)
+    // ما نحاول redirect لأن Vercel عادة يعمله تلقائياً
+    if (req.headers['x-forwarded-proto'] === 'http' && req.hostname !== 'localhost') {
+      console.log(`[SECURE] Redirecting ${req.path} to HTTPS`);
+      return res.redirect(301, `https://${req.hostname}${req.originalUrl}`);
     }
     next();
   });
@@ -209,41 +212,48 @@ app.get('/api/health', async (req, res) => {
 console.log('[T5b] /api/health route defined, about to build sessionConfig');
 
 // ─────────────────────────────────────────────
-// [SERVERLESS FIX] تحسين معالجة Session Storage
-// في Vercel/Serverless البيئة، MongoStore قد يفشل
-// لكن يجب إنشاء Store بشكل async
+// [SERVERLESS FIX] Session Storage Strategy
+// في Vercel: استخدم MemoryStore فقط (لا تنتظر MongoDB async)
+// في Local: استخدم MongoStore (مع deferred initialization)
 // ─────────────────────────────────────────────
-const useMongoStore = process.env.DISABLE_MONGO_SESSION_STORE !== 'true';
-console.log('[T5b2] useMongoStore =', useMongoStore);
-
 let sessionStore = undefined;
-if (useMongoStore) {
-  try {
-    sessionStore = MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI,
-      collectionName: 'sessions',
-      ttl: 24 * 60 * 60,
-      autoRemove: 'native',
-      touchAfter: 24 * 3600,
-      mongoOptions: {
-        serverSelectionTimeoutMS: 5000,
-        connectTimeoutMS: 5000,
-        socketTimeoutMS: 10000,
-      }
-    });
-    sessionStore.on('error', (err) => {
-      console.error('[MongoStore Error]', err.message);
-    });
-    console.log('[T5c] MongoStore created successfully');
-  } catch (error) {
-    console.error('[T5c] Failed to create MongoStore:', error.message);
-    console.log('[T5c] Falling back to MemoryStore');
-    sessionStore = undefined;
-  }
-}
 
-if (!sessionStore) {
-  console.log('[T5c] Using default MemoryStore');
+if (process.env.NODE_ENV === 'production') {
+  // ✅ في production (Vercel): استخدم MemoryStore - بدون await، بدون hanging
+  console.log('[T5c] Production mode: Using MemoryStore (no MongoDB session persistence)');
+} else {
+  // في development: محاول إنشاء MongoStore
+  const useMongoStore = process.env.DISABLE_MONGO_SESSION_STORE !== 'true';
+  console.log('[T5b2] Development mode: useMongoStore =', useMongoStore);
+  
+  if (useMongoStore) {
+    try {
+      sessionStore = MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI,
+        collectionName: 'sessions',
+        ttl: 24 * 60 * 60,
+        autoRemove: 'native',
+        touchAfter: 24 * 3600,
+        mongoOptions: {
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 5000,
+          socketTimeoutMS: 10000,
+        }
+      });
+      if (sessionStore.on) {
+        sessionStore.on('error', (err) => {
+          console.error('[MongoStore Error]', err.message);
+        });
+      }
+      console.log('[T5c] MongoStore created (async)');
+    } catch (error) {
+      console.error('[T5c] Failed to create MongoStore:', error.message);
+      console.log('[T5c] Falling back to MemoryStore');
+      sessionStore = undefined;
+    }
+  } else {
+    console.log('[T5c] DISABLE_MONGO_SESSION_STORE is set: Using MemoryStore');
+  }
 }
 
 // Session configuration
@@ -273,7 +283,80 @@ app.use((req, res, next) => {
   next();
 });
 
-// Static files
+// ─────────────────────────────────────────────
+// [CRITICAL] Initialization middleware يجب يكون قبل كل middleware
+// حتى static files - عشان MongoDB قد يكون مش متصل بعد
+// ─────────────────────────────────────────────
+let initializationPromise = null;
+let initializationAttempted = false;
+
+const initializeApp = async () => {
+  // إذا بالفعل جاري محاولة initialization، انتظر النتيجة
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  initializationAttempted = true;
+
+  // ✅ Timeout wrapper: لا تنتظر أكثر من 10 ثواني في production
+  const timeoutMs = process.env.NODE_ENV === 'production' ? 10000 : 30000;
+  
+  initializationPromise = Promise.race([
+    (async () => {
+      console.log('[INIT] Starting initialization');
+      try {
+        await connectDB();
+        console.log('[INIT] MongoDB connected');
+        await Admin.initializeDefault();
+        console.log('[INIT] Admin initialized');
+      } catch (error) {
+        console.error('[INIT] Error during initialization:', error.message);
+        // في Vercel، ما تفشل كل الـ app - فقط log الخطأ
+        // Session ستستخدم MemoryStore على كل حال
+      }
+    })(),
+    new Promise((_, reject) =>
+      setTimeout(() => {
+        console.warn(`[INIT] Timeout after ${timeoutMs}ms - continuing anyway`);
+        reject(new Error(`Initialization timeout after ${timeoutMs}ms`));
+      }, timeoutMs)
+    )
+  ]);
+
+  try {
+    await initializationPromise;
+  } catch (error) {
+    // في Vercel timeout ما يفشل الـ request - فقط log ويكمل
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[INIT-WARN] Initialization timed out in production, continuing...');
+      initializationPromise = Promise.resolve(); // اعتبر success حتى لا نحاول مجدداً
+    } else {
+      throw error; // في development رفع الخطأ
+    }
+  }
+
+  return initializationPromise;
+};
+
+app.use(async (req, res, next) => {
+  console.log('[REQ-B] about to call initializeApp for', req.path);
+  try {
+    await initializeApp();
+    console.log('[REQ-C] initializeApp resolved for', req.path);
+    next();
+  } catch (error) {
+    console.log('[REQ-ERR] initializeApp threw:', error.message);
+    // في production ما توقف الـ request - كمل للـ next middleware
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[REQ-WARN] Continuing despite initialization error');
+      next();
+    } else {
+      next(error);
+    }
+  }
+});
+
+// Static files - بعد initialization
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
@@ -298,43 +381,6 @@ app.get('/api/activate/public-key', (req, res) => {
   });
 });
 
-let initializationPromise = null;
-
-const initializeApp = async () => {
-  if (initializationPromise) {
-    return initializationPromise;
-  }
-
-  initializationPromise = (async () => {
-    await connectDB();
-    await Admin.initializeDefault();
-  })();
-
-  return initializationPromise;
-};
-
-app.use(async (req, res, next) => {
-  if (req.path === '/api/health') {
-    return next();
-  }
-
-  console.log('[REQ-B] about to call initializeApp for', req.path);
-  try {
-    await initializeApp();
-    console.log('[REQ-C] initializeApp resolved for', req.path);
-    next();
-  } catch (error) {
-    console.log('[REQ-ERR] initializeApp threw:', error.message);
-    next(error);
-  }
-});
-
-// Serve admin panel
-app.get(['/', '/admin'], (req, res) => {
-  console.log('[REQ-D] serving index.html for', req.path);
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
@@ -351,15 +397,24 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
   try {
-    await initializeApp();
-
-    app.listen(PORT, () => {
+    // ✅ في Vercel: ابدأ الـ listener فوراً، بدون انتظار على initialization
+    // initialization بتحصل بشكل async في الخلفية عند أول API request
+    const server = app.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
+
+    // Try initialization بالخلفية (بدون انتظار)
+    initializeApp().catch((error) => {
+      console.error('[BACKGROUND INIT ERROR]', error.message);
+    });
+
+    return server;
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    if (require.main === module) {
+      process.exit(1);
+    }
   }
 };
 
