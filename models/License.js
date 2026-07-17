@@ -5,8 +5,7 @@ const licenseSchema = new mongoose.Schema({
     type: String,
     required: true,
     uppercase: true,
-    trim: true,
-    index: true
+    trim: true
   },
   requestId: {
     type: mongoose.Schema.Types.ObjectId,

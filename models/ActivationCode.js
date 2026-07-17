@@ -61,10 +61,8 @@ const activationCodeSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-activationCodeSchema.index({ code: 1, used: 1 });
 activationCodeSchema.index({ deviceId: 1, used: 1 });
 activationCodeSchema.index({ requestId: 1, deviceId: 1 });
-activationCodeSchema.index({ code: 1, deviceId: 1, status: 1 });
 
 // Virtual for status text
 activationCodeSchema.virtual('statusText').get(function() {

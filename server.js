@@ -209,28 +209,42 @@ app.get('/api/health', async (req, res) => {
 console.log('[T5b] /api/health route defined, about to build sessionConfig');
 
 // ─────────────────────────────────────────────
-// [TEST] تبديل بين MongoStore والتخزين الافتراضي بالذاكرة
-// لعزل المشكلة - إذا DISABLE_MONGO_SESSION_STORE=true بفيرسال
-// رح يستخدم MemoryStore بدل الاتصال بقاعدة البيانات
+// [SERVERLESS FIX] تحسين معالجة Session Storage
+// في Vercel/Serverless البيئة، MongoStore قد يفشل
+// لكن يجب إنشاء Store بشكل async
 // ─────────────────────────────────────────────
 const useMongoStore = process.env.DISABLE_MONGO_SESSION_STORE !== 'true';
 console.log('[T5b2] useMongoStore =', useMongoStore);
 
-const sessionStore = useMongoStore
-  ? MongoStore.create({
+let sessionStore = undefined;
+if (useMongoStore) {
+  try {
+    sessionStore = MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
       collectionName: 'sessions',
       ttl: 24 * 60 * 60,
       autoRemove: 'native',
       touchAfter: 24 * 3600,
       mongoOptions: {
-        serverSelectionTimeoutMS: 8000,
-        connectTimeoutMS: 8000,
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 10000,
       }
-    })
-  : undefined; // undefined = express-session بيستخدم MemoryStore الافتراضي
+    });
+    sessionStore.on('error', (err) => {
+      console.error('[MongoStore Error]', err.message);
+    });
+    console.log('[T5c] MongoStore created successfully');
+  } catch (error) {
+    console.error('[T5c] Failed to create MongoStore:', error.message);
+    console.log('[T5c] Falling back to MemoryStore');
+    sessionStore = undefined;
+  }
+}
 
-console.log('[T5c] sessionStore built (useMongoStore=' + useMongoStore + ')');
+if (!sessionStore) {
+  console.log('[T5c] Using default MemoryStore');
+}
 
 // Session configuration
 const sessionConfig = {
