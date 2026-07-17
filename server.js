@@ -288,7 +288,6 @@ app.use((req, res, next) => {
 // حتى static files - عشان MongoDB قد يكون مش متصل بعد
 // ─────────────────────────────────────────────
 let initializationPromise = null;
-let initializationAttempted = false;
 
 const initializeApp = async () => {
   // إذا بالفعل جاري محاولة initialization، انتظر النتيجة
@@ -296,44 +295,32 @@ const initializeApp = async () => {
     return initializationPromise;
   }
 
-  initializationAttempted = true;
-
   // ✅ Timeout wrapper: لا تنتظر أكثر من 10 ثواني في production
   const timeoutMs = process.env.NODE_ENV === 'production' ? 10000 : 30000;
   
-  initializationPromise = Promise.race([
-    (async () => {
-      console.log('[INIT] Starting initialization');
-      try {
-        await connectDB();
-        console.log('[INIT] MongoDB connected');
-        await Admin.initializeDefault();
-        console.log('[INIT] Admin initialized');
-      } catch (error) {
-        console.error('[INIT] Error during initialization:', error.message);
-        // في Vercel، ما تفشل كل الـ app - فقط log الخطأ
-        // Session ستستخدم MemoryStore على كل حال
-      }
-    })(),
-    new Promise((_, reject) =>
-      setTimeout(() => {
-        console.warn(`[INIT] Timeout after ${timeoutMs}ms - continuing anyway`);
-        reject(new Error(`Initialization timeout after ${timeoutMs}ms`));
-      }, timeoutMs)
-    )
-  ]);
+  let timedOut = false;
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true;
+    console.warn(`[INIT] Timeout after ${timeoutMs}ms - continuing anyway`);
+  }, timeoutMs);
 
-  try {
-    await initializationPromise;
-  } catch (error) {
-    // في Vercel timeout ما يفشل الـ request - فقط log ويكمل
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('[INIT-WARN] Initialization timed out in production, continuing...');
-      initializationPromise = Promise.resolve(); // اعتبر success حتى لا نحاول مجدداً
-    } else {
-      throw error; // في development رفع الخطأ
+  initializationPromise = (async () => {
+    try {
+      console.log('[INIT] Starting initialization');
+      await connectDB();
+      console.log('[INIT] MongoDB connected');
+      await Admin.initializeDefault();
+      console.log('[INIT] Admin initialized');
+    } catch (error) {
+      if (!timedOut) {
+        console.error('[INIT] Error during initialization:', error.message);
+      }
+      // في Vercel، ما تفشل كل الـ app - فقط log الخطأ
+      // Session ستستخدم MemoryStore على كل حال
+    } finally {
+      clearTimeout(timeoutHandle);
     }
-  }
+  })();
 
   return initializationPromise;
 };
