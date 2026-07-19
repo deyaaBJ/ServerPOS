@@ -1,31 +1,9 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/ping.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/db-test.js",
-      "use": "@vercel/node"
-    }
+    { "src": "server.js", "use": "@vercel/node" }
   ],
   "routes": [
-    {
-      "src": "/api/ping",
-      "dest": "api/ping.js"
-    },
-    {
-      "src": "/api/db-test",
-      "dest": "api/db-test.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "server.js"
-    }
+    { "src": "/(.*)", "dest": "server.js" }
   ]
 }

@@ -23,8 +23,7 @@
     "helmet": "^7.1.0",
     "mongoose": "^8.9.5",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "serverless-http": "^4.0.0"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "esbuild": "^0.28.1",

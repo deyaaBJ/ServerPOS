@@ -10,7 +10,6 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
-const serverless = require('serverless-http');
 
 const connectDB = require('./config/database');
 const { errorHandler } = require('./middleware/errorHandler');
@@ -30,8 +29,12 @@ console.log('[T0j] activation routes required - all requires done');
 
 
 const app = express();
-console.log('[T1] express app created');
 
+console.log('[T1] express app created');
+app.get("/test", (req, res) => {
+  console.log("TEST ROUTE");
+  res.json({ ok: true });
+});
 
 // ─────────────────────────────────────────────
 // [FIX 1] التحقق من المتغيرات الإلزامية عند البدء
@@ -274,7 +277,7 @@ const sessionConfig = {
 
 console.log('[T5d] sessionConfig built');
 
-app.use(session(sessionConfig));
+// app.use(session(sessionConfig));
 
 console.log('[T7] session middleware attached');
 
@@ -325,6 +328,11 @@ const initializeApp = async () => {
   return initializationPromise;
 };
 
+// ─────────────────────────────────────────────
+// [FIX 5] إعادة تفعيل middleware الـ initialization
+// كان معطّل بالكامل (comment) فالـ DB ما كانت تتضمن أبداً
+// قبل أي route - هلق منتظر MongoDB يتصل قبل أي طلب
+// ─────────────────────────────────────────────
 app.use(async (req, res, next) => {
   console.log('[REQ-B] about to call initializeApp for', req.path);
   try {
@@ -379,39 +387,37 @@ app.use((req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-// Start server
+// Start server (فقط عند التشغيل المحلي المباشر)
 const PORT = process.env.PORT || 3000;
 
-const startServer = async () => {
-  try {
-    // ✅ في Vercel: ابدأ الـ listener فوراً، بدون انتظار على initialization
-    // initialization بتحصل بشكل async في الخلفية عند أول API request
-    const server = app.listen(PORT, () => {
-      console.log(`✅ Server running on port ${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
-
-    // Try initialization بالخلفية (بدون انتظار)
-    initializeApp().catch((error) => {
-      console.error('[BACKGROUND INIT ERROR]', error.message);
-    });
-
-    return server;
-  } catch (error) {
-    console.error('Failed to start server:', error);
-    if (require.main === module) {
+if (require.main === module) {
+  const startServer = async () => {
+    try {
+      // في local: منستنى الاتصال بقاعدة البيانات قبل ما نبلش نسمع للطلبات
+      await initializeApp();
+      app.listen(PORT, () => {
+        console.log(`✅ Server running on port ${PORT}`);
+        console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+    } catch (error) {
+      console.error('Failed to start server:', error);
       process.exit(1);
     }
-  }
-};
-
-if (require.main === module) {
+  };
   startServer();
 }
 
+console.log('[T8] module fully loaded, exporting app now');
 
-console.log('[T8] module fully loaded, exporting handler now');
-module.exports = serverless(app);
+// ─────────────────────────────────────────────
+// [FIX 6 - الأهم] Vercel بيحتاج الـ Express app نفسها مصدّرة
+// مباشرة (بدون أي wrapper مثل serverless-http)، لأن Vercel's
+// Node.js runtime بيستدعي الـ handler بصيغة (req, res) القياسية
+// وهاد بالضبط شكل Express app. استخدام serverless-http (المصمم
+// لـ AWS Lambda) كان بيخلي كل طلب يعلق لحد ما يوصل الـ 300 ثانية
+// timeout - وهاد كان سبب مشكلتك بالضبط.
+// ─────────────────────────────────────────────
+module.exports = app;
 
 // Handle unhandled rejections
 // [FIX] على serverless ما منقتل الـ process لأي unhandled rejection
