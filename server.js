@@ -221,42 +221,43 @@ console.log('[T5b] /api/health route defined, about to build sessionConfig');
 // ─────────────────────────────────────────────
 let sessionStore = undefined;
 
-if (process.env.NODE_ENV === 'production') {
-  // ✅ في production (Vercel): استخدم MemoryStore - بدون await، بدون hanging
-  console.log('[T5c] Production mode: Using MemoryStore (no MongoDB session persistence)');
-} else {
-  // في development: محاول إنشاء MongoStore
-  const useMongoStore = process.env.DISABLE_MONGO_SESSION_STORE !== 'true';
-  console.log('[T5b2] Development mode: useMongoStore =', useMongoStore);
-  
-  if (useMongoStore) {
-    try {
-      sessionStore = MongoStore.create({
-        mongoUrl: process.env.MONGODB_URI,
-        collectionName: 'sessions',
-        ttl: 24 * 60 * 60,
-        autoRemove: 'native',
-        touchAfter: 24 * 3600,
-        mongoOptions: {
-          serverSelectionTimeoutMS: 5000,
-          connectTimeoutMS: 5000,
-          socketTimeoutMS: 10000,
-        }
-      });
-      if (sessionStore.on) {
-        sessionStore.on('error', (err) => {
-          console.error('[MongoStore Error]', err.message);
-        });
+// ─────────────────────────────────────────────
+// [FIX 7 - حل مشكلة تسجيل الدخول] لازم نستخدم MongoStore
+// بكل البيئات وليس فقط بـ development. بـ Vercel (serverless)
+// كل طلب ممكن ينفذ بحاوية (container) مختلفة، فالـ MemoryStore
+// ما بتنعمل بين الطلبات - يعني حتى لو سجّلت دخول بنجاح، الطلب
+// يلي بعده ما رح يلاقي الـ session وبترجع "غير مسجل دخول".
+// ─────────────────────────────────────────────
+const useMongoStore = process.env.DISABLE_MONGO_SESSION_STORE !== 'true';
+console.log('[T5b2] useMongoStore =', useMongoStore);
+
+if (useMongoStore) {
+  try {
+    sessionStore = MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60,
+      autoRemove: 'native',
+      touchAfter: 24 * 3600,
+      mongoOptions: {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 10000,
       }
-      console.log('[T5c] MongoStore created (async)');
-    } catch (error) {
-      console.error('[T5c] Failed to create MongoStore:', error.message);
-      console.log('[T5c] Falling back to MemoryStore');
-      sessionStore = undefined;
+    });
+    if (sessionStore.on) {
+      sessionStore.on('error', (err) => {
+        console.error('[MongoStore Error]', err.message);
+      });
     }
-  } else {
-    console.log('[T5c] DISABLE_MONGO_SESSION_STORE is set: Using MemoryStore');
+    console.log('[T5c] MongoStore created (async)');
+  } catch (error) {
+    console.error('[T5c] Failed to create MongoStore:', error.message);
+    console.log('[T5c] Falling back to MemoryStore');
+    sessionStore = undefined;
   }
+} else {
+  console.log('[T5c] DISABLE_MONGO_SESSION_STORE is set: Using MemoryStore');
 }
 
 // Session configuration
@@ -277,7 +278,12 @@ const sessionConfig = {
 
 console.log('[T5d] sessionConfig built');
 
-// app.use(session(sessionConfig));
+// ─────────────────────────────────────────────
+// [FIX 7 - الأهم لتسجيل الدخول] كان هاد السطر معلّق بالكامل
+// فالـ session middleware ما كان شغال أبداً - يعني تسجيل
+// الدخول بينجح لحظياً بس ما في مكان يخزن فيه "أنت مسجل دخول"
+// ─────────────────────────────────────────────
+app.use(session(sessionConfig));
 
 console.log('[T7] session middleware attached');
 
@@ -376,7 +382,19 @@ app.get('/api/activate/public-key', (req, res) => {
   });
 });
 
-// 404 handler
+// ─────────────────────────────────────────────
+// [FIX 8] SPA fallback - الفرونت اند صار عنده صفحات حقيقية
+// (react-router: /requests, /active-codes...) لازم أي طلب GET
+// مش API ومش ملف static يرجع index.html حتى يتولى React Router
+// التوجيه بالمتصفح، وإلا الـ refresh أو الرابط المباشر بيطلع 404
+// ─────────────────────────────────────────────
+app.get(/^\/(?!api\/).*/, (req, res, next) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => {
+    if (err) next(err);
+  });
+});
+
+// 404 handler (يبقى للـ API routes غير الموجودة)
 app.use((req, res) => {
   res.status(404).json({
     success: false,
