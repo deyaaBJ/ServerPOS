@@ -141,6 +141,17 @@ app.use(cors(corsOptions));
 
 console.log('[T4] cors configured, allowedOrigins=', allowedOrigins);
 
+// ─────────────────────────────────────────────
+// [FIX 9 - الأهم لتسجيل الدخول] express.json() كان مفقود بالكامل
+// بدونه req.body بيضل فاضي لكل طلبات POST/PUT، فأي validator
+// بيفحص حقل بالـ body (متل key بتسجيل الدخول) بيفشل دايماً
+// حتى لو الفرونت اند بيبعت البيانات صح
+// ─────────────────────────────────────────────
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+console.log('[T4c] body parsers (express.json/urlencoded) attached');
+
 
 // عام - 30 request/دقيقة لكل IP
 const limiter = rateLimit({
@@ -427,19 +438,8 @@ if (require.main === module) {
 
 console.log('[T8] module fully loaded, exporting app now');
 
-// ─────────────────────────────────────────────
-// [FIX 6 - الأهم] Vercel بيحتاج الـ Express app نفسها مصدّرة
-// مباشرة (بدون أي wrapper مثل serverless-http)، لأن Vercel's
-// Node.js runtime بيستدعي الـ handler بصيغة (req, res) القياسية
-// وهاد بالضبط شكل Express app. استخدام serverless-http (المصمم
-// لـ AWS Lambda) كان بيخلي كل طلب يعلق لحد ما يوصل الـ 300 ثانية
-// timeout - وهاد كان سبب مشكلتك بالضبط.
-// ─────────────────────────────────────────────
 module.exports = app;
 
-// Handle unhandled rejections
-// [FIX] على serverless ما منقتل الـ process لأي unhandled rejection
-// لأنو هاد ممكن يوقف باقي الطلبات الشغالة بنفس الـ container بدون داعي
 process.on('unhandledRejection', (err) => {
   console.error('UNHANDLED REJECTION:', err.name, err.message);
 });
