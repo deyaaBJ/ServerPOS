@@ -17,6 +17,7 @@ router.post('/login', validateLogin, adminController.login);
 router.post('/change-password', adminOnly, validateChangePassword, adminController.changePassword);
 router.get('/stats', adminOnly, adminController.getStats);
 router.get('/activation-requests', adminOnly, adminController.getActivationRequests);
+router.get('/activation-logs', adminOnly, adminController.getActivationLogs);
 router.post(
   '/activate-device',
   adminOnly,

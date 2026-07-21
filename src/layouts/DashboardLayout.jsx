@@ -145,6 +145,9 @@ export default function DashboardLayout({ onLogout }) {
             <NavLink to="/active-codes" className={({ isActive }) => (isActive ? 'active' : '')}>
               الأكواد المفعلة
             </NavLink>
+            <NavLink to="/activation-logs" className={({ isActive }) => (isActive ? 'active' : '')}>
+              سجل التفعيل
+            </NavLink>
           </nav>
 
           {loading

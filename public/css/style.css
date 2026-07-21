@@ -1410,6 +1410,20 @@ body {
   width: min(260px, 42vw);
 }
 
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.search-row .form-control {
+  min-width: min(320px, 50vw);
+}
+
+.search-row .btn {
+  white-space: nowrap;
+}
+
 .table-container {
   border: 1px solid #e2e8f0;
   border-radius: 8px;

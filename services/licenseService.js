@@ -528,6 +528,20 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
 
   const token = await issueLicenseToken({ license, binding, now });
 
+  await createAuditLog({
+    req,
+    action: 'activate',
+    outcome: 'success',
+    code: license.code,
+    deviceId: normalizedDeviceId,
+    requestId: request?._id || activationCode.requestId || null,
+    metadata: {
+      source: 'device-status',
+      licenseId: String(license._id),
+      viaExistingCode: true
+    }
+  });
+
   return {
     activated: true,
     status,

@@ -59,5 +59,6 @@ const licenseAuditLogSchema = new mongoose.Schema({
 
 licenseAuditLogSchema.index({ code: 1, createdAt: -1 });
 licenseAuditLogSchema.index({ deviceId: 1, createdAt: -1 });
+licenseAuditLogSchema.index({ requestId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('LicenseAuditLog', licenseAuditLogSchema);

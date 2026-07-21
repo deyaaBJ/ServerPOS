@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardLayout from './layouts/DashboardLayout';
 import RequestsPage from './pages/RequestsPage';
 import ActiveCodesPage from './pages/ActiveCodesPage';
+import ActivationLogsPage from './pages/ActivationLogsPage';
 
 function RequireAuth({ loggedIn, children }) {
   if (!loggedIn) return <Navigate to="/login" replace />;
@@ -53,6 +54,7 @@ export default function App() {
           <Route index element={<Navigate to="/requests" replace />} />
           <Route path="requests" element={<RequestsPage />} />
           <Route path="active-codes" element={<ActiveCodesPage />} />
+          <Route path="activation-logs" element={<ActivationLogsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/requests" replace />} />
       </Routes>

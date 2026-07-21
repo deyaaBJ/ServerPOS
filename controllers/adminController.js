@@ -1,8 +1,10 @@
 const Admin = require('../models/Admin');
 const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
+const LicenseAuditLog = require('../models/LicenseAuditLog');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const { isCodeExpired, normalizeCode } = require('../utils/code');
+const { createAuditLog } = require('../services/auditLogService');
 
 const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -181,6 +183,31 @@ const attachPreviousRequestsToRequests = async (requests) => Promise.all(
   }))
 );
 
+const getActivationLogFilters = async (clientName) => {
+  const trimmedName = clientName?.trim();
+
+  if (!trimmedName) {
+    return null;
+  }
+
+  const matchingRequests = await ActivationRequest.find({
+    clientName: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: 'i' },
+    status: { $in: ['approved', 'completed'] },
+    isArchived: { $ne: true }
+  })
+    .select('_id clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
+    .lean();
+
+  if (!matchingRequests.length) {
+    return { requestIds: [], clientName: trimmedName };
+  }
+
+  return {
+    requestIds: matchingRequests.map((request) => request._id),
+    clientName: trimmedName
+  };
+};
+
 // Login
 exports.login = asyncHandler(async (req, res) => {
   const { key } = req.body;
@@ -318,6 +345,44 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     requests: requestsWithPreviousRequests
+  });
+});
+
+exports.getActivationLogs = asyncHandler(async (req, res) => {
+  const { clientName } = req.query;
+  const filters = await getActivationLogFilters(clientName);
+
+  if (!filters) {
+    return res.json({
+      success: true,
+      logs: [],
+      searched: false
+    });
+  }
+
+  if (!filters.requestIds.length) {
+    return res.json({
+      success: true,
+      logs: [],
+      searched: true,
+      clientName: filters.clientName
+    });
+  }
+
+  const logs = await LicenseAuditLog.find({
+    action: 'activate',
+    requestId: { $in: filters.requestIds }
+  })
+    .populate('requestId', 'clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
+    .sort({ createdAt: -1 })
+    .limit(200)
+    .lean();
+
+  res.json({
+    success: true,
+    logs,
+    searched: true,
+    clientName: filters.clientName
   });
 });
 
@@ -633,12 +698,12 @@ exports.adminActivateDevice = asyncHandler(async (req, res) => {
   // Create audit log
   await createAuditLog({
     req,
-    action: 'activate-device',
+    action: 'activate',
     outcome: 'success',
     code: license.code,
     deviceId,
     requestId: null,
-    metadata: { adminActivated: true }
+    metadata: { adminActivated: true, directActivation: true, licenseType }
   });
 
   res.status(201).json({
