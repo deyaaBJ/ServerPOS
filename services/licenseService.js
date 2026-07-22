@@ -477,8 +477,11 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
     .sort({ updatedAt: -1, createdAt: -1 });
   let license = binding ? await License.findById(binding.licenseId) : null;
 
+  let request = null;          // ✅ إضافة هون
+  let activationCode = null;   // ✅ إضافة هون
+
   if (!license) {
-    const activationCode = await ActivationCode.findOne({
+    activationCode = await ActivationCode.findOne({   // بدون const
       deviceId: normalizedDeviceId,
       used: true
     }).sort({ activatedAt: -1, createdAt: -1 });
@@ -487,7 +490,7 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
       return inactiveResult(activationCode?.status === 'expired' ? 'expired' : 'not_activated');
     }
 
-    const request = activationCode.requestId
+    request = activationCode.requestId              // بدون const
       ? await ActivationRequest.findById(activationCode.requestId)
       : null;
 
@@ -534,7 +537,7 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
     outcome: 'success',
     code: license.code,
     deviceId: normalizedDeviceId,
-    requestId: request?._id || activationCode.requestId || null,
+    requestId: request?._id || activationCode?.requestId || null,  // ✅ إضافة ?. هون كمان
     metadata: {
       source: 'device-status',
       licenseId: String(license._id),
