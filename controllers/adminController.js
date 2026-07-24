@@ -94,6 +94,25 @@ const getPreviousRequestsDetails = async (deviceId, currentRequestId = null) => 
   }));
 };
 
+const archiveEndedRequestsForDevice = async (deviceId, currentRequestId = null) => {
+  const filter = {
+    deviceId: deviceId.trim(),
+    status: { $in: ['completed', 'deactivated', 'expired', 'rejected'] },
+    isArchived: { $ne: true }
+  };
+
+  if (currentRequestId) {
+    filter._id = { $ne: currentRequestId };
+  }
+
+  await ActivationRequest.updateMany(filter, {
+    $set: {
+      isArchived: true,
+      archivedAt: new Date()
+    }
+  });
+};
+
 const attachDeviceUsageToRequests = async (requests) => {
   if (!requests.length) {
     return [];
@@ -172,11 +191,11 @@ const getActivationLogFilters = async (clientName) => {
     .lean();
 
   if (!matchingRequests.length) {
-    return { requestIds: [], clientName: trimmedName };
+    return { deviceIds: [], clientName: trimmedName };
   }
 
   return {
-    requestIds: matchingRequests.map((request) => request._id),
+    deviceIds: [...new Set(matchingRequests.map((request) => request.deviceId).filter(Boolean))],
     clientName: trimmedName
   };
 };
@@ -333,7 +352,7 @@ exports.getActivationLogs = asyncHandler(async (req, res) => {
     });
   }
 
-  if (!filters.requestIds.length) {
+  if (!filters.deviceIds.length) {
     return res.json({
       success: true,
       logs: [],
@@ -344,7 +363,7 @@ exports.getActivationLogs = asyncHandler(async (req, res) => {
 
   const logs = await LicenseAuditLog.find({
     action: 'activate',
-    requestId: { $in: filters.requestIds }
+    deviceId: { $in: filters.deviceIds }
   })
     .populate('requestId', 'clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
     .sort({ createdAt: -1 })
@@ -378,17 +397,6 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
 
   if (!clientName) {
     throw new AppError('Client name is required', 400);
-  }
-
-  const duplicateClient = await ActivationRequest.findOne({
-    _id: { $ne: request._id },
-    isArchived: { $ne: true },
-    status: { $in: ['approved', 'completed'] },
-    clientName: { $regex: `^${escapeRegExp(clientName)}$`, $options: 'i' }
-  }).select('_id clientName assignedCode');
-
-  if (duplicateClient) {
-    throw new AppError('Client name already exists. Use a unique client name.', 409);
   }
 
   const approvedAt = new Date();
@@ -428,6 +436,8 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
   request.rejectedAt = null;
   request.rejectionReason = null;
   await request.save();
+
+  await archiveEndedRequestsForDevice(request.deviceId, request._id);
 
   const previousRequests = await getPreviousRequestsDetails(request.deviceId, request._id);
 

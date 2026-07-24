@@ -10,7 +10,7 @@ const activationTypeLabel = (log) => {
 };
 
 export default function ActivationLogsPage() {
-  const { openDetails } = useDashboardData();
+  const { openDetails, latestRequestByDevice } = useDashboardData();
   const [searchName, setSearchName] = useState('');
   const [submittedName, setSubmittedName] = useState('');
   const [logs, setLogs] = useState([]);
@@ -85,10 +85,10 @@ export default function ActivationLogsPage() {
             ) : logs.length ? (
               logs.map((log) => {
                 const activationRequest = log.requestId || {};
-                return (
-                  <tr key={log._id}>
-                    <td>{activationRequest.clientName || submittedName || '-'}</td>
-                    <td><code>{activationRequest.deviceId || log.deviceId || '-'}</code></td>
+              return (
+                <tr key={log._id}>
+                    <td>{activationRequest.clientName || latestRequestByDevice?.[activationRequest.deviceId || log.deviceId]?.clientName || submittedName || '-'}</td>
+                    <td><code>{activationRequest.deviceId || log.deviceId || latestRequestByDevice?.[activationRequest.deviceId || log.deviceId]?.deviceId || '-'}</code></td>
                     <td>{activationTypeLabel(log)}</td>
                     <td><span className="code-text">{log.code || activationRequest.assignedCode || '-'}</span></td>
                     <td><span className="date-text">{formatDate(log.createdAt)}</span></td>

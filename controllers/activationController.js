@@ -10,6 +10,30 @@ const {
   revokeLicense
 } = require('../services/licenseService');
 const { createAuditLog } = require('../services/auditLogService');
+const { sendEmailNotification } = require('../services/emailNotificationService');
+
+const buildRequestNotification = async (request) => {
+  const previousRequest = await ActivationRequest.findOne({
+    deviceId: request.deviceId,
+    _id: { $ne: request._id },
+    clientName: { $ne: null }
+  })
+    .sort({ createdAt: -1 })
+    .select('clientName deviceId')
+    .lean();
+
+  if (previousRequest?.clientName) {
+    return {
+      subject: `طلب جديد للجهاز ${request.deviceId} للعميل ${previousRequest.clientName}`,
+      text: `وصل طلب جديد للجهاز ${request.deviceId} للعميل ${previousRequest.clientName}.`
+    };
+  }
+
+  return {
+    subject: `طلب جديد للجهاز ${request.deviceId}`,
+    text: `وصل طلب جديد للجهاز ${request.deviceId}.`
+  };
+};
 
 const buildSuccessResponse = (data, meta = {}) => ({
   success: true,
@@ -48,6 +72,16 @@ exports.createRequest = asyncHandler(async (req, res) => {
     deviceId: normalizedDeviceId,
     status: 'pending'
   });
+
+  buildRequestNotification(request)
+    .then((message) => sendEmailNotification({
+      to: process.env.REQUESTS_NOTIFICATION_EMAIL,
+      subject: message.subject,
+      text: message.text
+    }))
+    .catch((error) => {
+      console.error('[Email] Failed to send notification:', error.message);
+    });
 
   res.status(201).json(buildSuccessResponse({
     requestId: request._id,

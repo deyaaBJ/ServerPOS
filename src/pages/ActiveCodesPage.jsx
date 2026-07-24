@@ -3,7 +3,7 @@ import { formatDate, statusClass, statusLabel } from '../api';
 import { useDashboardData } from '../layouts/DashboardLayout';
 
 export default function ActiveCodesPage() {
-  const { codes, openDetails } = useDashboardData();
+  const { codes, openDetails, latestRequestByDevice } = useDashboardData();
   const [searchTerm, setSearchTerm] = useState('');
 
   const activeCodes = useMemo(() => codes.filter((code) => {
@@ -50,9 +50,10 @@ export default function ActiveCodesPage() {
           <tbody>
             {filteredActiveCodes.map((code) => {
               const activationRequest = code.requestId || {};
+              const latestRequest = latestRequestByDevice?.[activationRequest.deviceId || code.deviceId];
               return (
                 <tr key={code._id || code.code}>
-                  <td>{activationRequest.clientName || '-'}</td>
+                  <td>{activationRequest.clientName || latestRequest?.clientName || '-'}</td>
                   <td><span className={`badge ${statusClass(activationRequest.status)}`}>{statusLabel(activationRequest.status)}</span></td>
                   <td><span className="date-text">{formatDate(activationRequest.approvedAt)}</span></td>
                   <td><span className="code-text">{code.code}</span></td>

@@ -21,6 +21,22 @@ export default function DashboardLayout({ onLogout }) {
   const [modal, setModal] = useState(null);
   const [approveForm, setApproveForm] = useState(emptyApproveForm);
 
+  const latestRequestByDevice = requests.reduce((acc, item) => {
+    const key = item.deviceId;
+    if (!key) return acc;
+    const current = acc[key];
+    if (!current) {
+      acc[key] = item;
+      return acc;
+    }
+    const currentTime = new Date(current.updatedAt || current.createdAt || 0).getTime();
+    const nextTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
+    if (nextTime >= currentTime) {
+      acc[key] = item;
+    }
+    return acc;
+  }, {});
+
   const loadAll = async () => {
     setLoading(true);
     try {
@@ -44,11 +60,12 @@ export default function DashboardLayout({ onLogout }) {
   }, []);
 
   const openDetails = (type, item) => {
+    const latestRequest = item?.deviceId ? latestRequestByDevice[item.deviceId] : null;
     setModal({ type, item });
     setApproveForm({
       code: item.assignedCode || item.code || '',
-      clientName: item.clientName || item.requestId?.clientName || '',
-      clientPhone: item.clientPhone || item.requestId?.clientPhone || ''
+      clientName: item.clientName || item.requestId?.clientName || latestRequest?.clientName || '',
+      clientPhone: item.clientPhone || item.requestId?.clientPhone || latestRequest?.clientPhone || ''
     });
   };
 
@@ -152,7 +169,7 @@ export default function DashboardLayout({ onLogout }) {
 
           {loading
             ? <div className="loading">جاري تحميل البيانات...</div>
-            : <Outlet context={{ requests, codes, openDetails }} />}
+            : <Outlet context={{ requests, codes, openDetails, latestRequestByDevice }} />}
         </div>
       </section>
 
