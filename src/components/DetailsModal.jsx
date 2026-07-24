@@ -105,7 +105,7 @@ function CodeDetails({ item, onDeactivate, busy }) {
         <DetailRow label="آخر تحقق">{formatDate(item.lastValidatedAt)}</DetailRow>
       </div>
 
-      {canDeactivate && (
+      {canDeactivate && !item.readOnly && (
         <div className="modal-actions">
           <button className="btn btn-danger" type="button" onClick={() => onDeactivate(activationRequest._id)} disabled={busy}>
             إلغاء التفعيل

@@ -34,7 +34,8 @@ export const statusLabel = (status) => ({
   approved: 'تم ربط الكود',
   rejected: 'مرفوض',
   completed: 'تم التفعيل',
-  deactivated: 'تم إلغاء التفعيل'
+  deactivated: 'تم إلغاء التفعيل',
+  expired: 'انتهى'
 }[status] || status || '-');
 
 export const statusClass = (status) => ({
@@ -42,5 +43,6 @@ export const statusClass = (status) => ({
   approved: 'badge-warning',
   rejected: 'badge-danger',
   completed: 'badge-success',
-  deactivated: 'badge-dark'
+  deactivated: 'badge-dark',
+  expired: 'badge-secondary'
 }[status] || 'badge-dark');

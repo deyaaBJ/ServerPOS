@@ -14,6 +14,7 @@ export default function RequestsPage() {
         <table>
           <thead>
             <tr>
+              <th>اسم العميل</th>
               <th>الحالة</th>
               <th>التاريخ والوقت</th>
               <th>التفاصيل</th>
@@ -22,6 +23,7 @@ export default function RequestsPage() {
           <tbody>
             {requests.map((item) => (
               <tr key={item._id}>
+                <td>{item.clientName || '-'}</td>
                 <td><span className={`badge ${statusClass(item.status)}`}>{statusLabel(item.status)}</span></td>
                 <td><span className="date-text">{formatDate(item.createdAt)}</span></td>
                 <td>
@@ -32,7 +34,7 @@ export default function RequestsPage() {
               </tr>
             ))}
             {!requests.length && (
-              <tr><td colSpan="3" className="empty-cell">لا توجد طلبات تفعيل حاليًا</td></tr>
+              <tr><td colSpan="4" className="empty-cell">لا توجد طلبات تفعيل حاليًا</td></tr>
             )}
           </tbody>
         </table>

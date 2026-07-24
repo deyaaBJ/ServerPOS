@@ -8,7 +8,7 @@ const activationRequestSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected', 'completed', 'deactivated'],
+    enum: ['pending', 'approved', 'rejected', 'completed', 'deactivated', 'expired'],
     default: 'pending'
   },
   assignedCode: {

@@ -36,14 +36,9 @@ const refreshExpiredRequestState = async (request) => {
     }
   );
 
-  request.status = 'pending';
-  request.assignedCode = null;
-  request.clientName = null;
-  request.clientPhone = null;
-  request.completedAt = null;
-  request.approvedAt = null;
-  request.rejectedAt = null;
-  request.rejectionReason = null;
+  request.status = 'expired';
+  request.rejectedAt = request.rejectedAt || new Date();
+  request.rejectionReason = request.rejectionReason || 'Activation expired';
   await request.save();
 
   return request;
@@ -97,27 +92,6 @@ const getPreviousRequestsDetails = async (deviceId, currentRequestId = null) => 
     completedAt: request.completedAt,
     codes: codesByRequestId.get(String(request._id)) || []
   }));
-};
-
-const deletePreviousRequestsForDevice = async (deviceId, currentRequestId) => {
-  const previousRequests = await ActivationRequest.find({
-    deviceId: deviceId.trim(),
-    _id: { $ne: currentRequestId }
-  }).select('_id');
-
-  const previousRequestIds = previousRequests.map((request) => request._id);
-
-  if (!previousRequestIds.length) {
-    return;
-  }
-
-  await ActivationCode.deleteMany({
-    requestId: { $in: previousRequestIds }
-  });
-
-  await ActivationRequest.deleteMany({
-    _id: { $in: previousRequestIds }
-  });
 };
 
 const attachDeviceUsageToRequests = async (requests) => {
@@ -192,7 +166,6 @@ const getActivationLogFilters = async (clientName) => {
 
   const matchingRequests = await ActivationRequest.find({
     clientName: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: 'i' },
-    status: { $in: ['approved', 'completed'] },
     isArchived: { $ne: true }
   })
     .select('_id clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
@@ -456,8 +429,6 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
   request.rejectionReason = null;
   await request.save();
 
-  await deletePreviousRequestsForDevice(request.deviceId, request._id);
-
   const previousRequests = await getPreviousRequestsDetails(request.deviceId, request._id);
 
   res.json({
@@ -532,11 +503,6 @@ exports.deactivateActivationRequest = asyncHandler(async (req, res) => {
   );
 
   request.status = 'deactivated';
-  request.assignedCode = null;
-  request.clientName = null;
-  request.clientPhone = null;
-  request.approvedAt = null;
-  request.completedAt = null;
   request.rejectedAt = new Date();
   request.rejectionReason = reason;
   await request.save();

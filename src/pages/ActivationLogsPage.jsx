@@ -96,7 +96,7 @@ export default function ActivationLogsPage() {
                       <button
                         className="action-btn details-btn"
                         type="button"
-                        onClick={() => openDetails('code', { ...log, requestId: activationRequest })}
+                        onClick={() => openDetails('code', { ...log, requestId: activationRequest, readOnly: true })}
                       >
                         تفاصيل
                       </button>
