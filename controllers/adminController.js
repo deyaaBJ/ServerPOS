@@ -8,6 +8,31 @@ const { createAuditLog } = require('../services/auditLogService');
 
 const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const getLatestClientDetailsForDevice = async (deviceId, currentRequestId = null) => {
+  if (!deviceId?.trim()) {
+    return { clientName: null, clientPhone: null };
+  }
+
+  const filter = {
+    deviceId: deviceId.trim(),
+    clientName: { $ne: null }
+  };
+
+  if (currentRequestId) {
+    filter._id = { $ne: currentRequestId };
+  }
+
+  const previousRequest = await ActivationRequest.findOne(filter)
+    .sort({ approvedAt: -1, createdAt: -1 })
+    .select('clientName clientPhone')
+    .lean();
+
+  return {
+    clientName: previousRequest?.clientName || null,
+    clientPhone: previousRequest?.clientPhone || null
+  };
+};
+
 const refreshExpiredRequestState = async (request) => {
   if (!request?.assignedCode || !request?.completedAt) {
     return request;
@@ -170,10 +195,16 @@ const attachDeviceUsageToRequests = async (requests) => {
 };
 
 const attachPreviousRequestsToRequests = async (requests) => Promise.all(
-  requests.map(async (request) => ({
-    ...request,
-    previousRequests: await getPreviousRequestsDetails(request.deviceId, request._id)
-  }))
+  requests.map(async (request) => {
+    const latestClientDetails = await getLatestClientDetailsForDevice(request.deviceId, request._id);
+
+    return {
+      ...request,
+      clientName: request.clientName || latestClientDetails.clientName,
+      clientPhone: request.clientPhone || latestClientDetails.clientPhone,
+      previousRequests: await getPreviousRequestsDetails(request.deviceId, request._id)
+    };
+  })
 );
 
 const getActivationLogFilters = async (clientName) => {
@@ -440,12 +471,15 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
   await archiveEndedRequestsForDevice(request.deviceId, request._id);
 
   const previousRequests = await getPreviousRequestsDetails(request.deviceId, request._id);
+  const latestClientDetails = await getLatestClientDetailsForDevice(request.deviceId, request._id);
 
   res.json({
     success: true,
     message: 'Activation request approved successfully',
     request: {
       ...request.toObject(),
+      clientName: request.clientName || latestClientDetails.clientName,
+      clientPhone: request.clientPhone || latestClientDetails.clientPhone,
       previousRequests
     }
   });

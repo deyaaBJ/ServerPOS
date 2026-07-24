@@ -3,7 +3,7 @@ import { formatDate, statusClass, statusLabel } from '../api';
 import { useDashboardData } from '../layouts/DashboardLayout';
 
 export default function RequestsPage() {
-  const { requests, openDetails } = useDashboardData();
+  const { requests, openDetails, latestRequestByDevice } = useDashboardData();
 
   return (
     <section className="table-section">
@@ -23,7 +23,7 @@ export default function RequestsPage() {
           <tbody>
             {requests.map((item) => (
               <tr key={item._id}>
-                <td>{item.clientName || '-'}</td>
+                <td>{item.clientName || latestRequestByDevice?.[item.deviceId]?.clientName || '-'}</td>
                 <td><span className={`badge ${statusClass(item.status)}`}>{statusLabel(item.status)}</span></td>
                 <td><span className="date-text">{formatDate(item.createdAt)}</span></td>
                 <td>
