@@ -1,6 +1,8 @@
 const Admin = require('../models/Admin');
 const ActivationCode = require('../models/ActivationCode');
 const ActivationRequest = require('../models/ActivationRequest');
+const DeviceBinding = require('../models/DeviceBinding');
+const License = require('../models/License');
 const LicenseAuditLog = require('../models/LicenseAuditLog');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
 const { isCodeExpired, normalizeCode } = require('../utils/code');
@@ -531,6 +533,18 @@ exports.deactivateActivationRequest = asyncHandler(async (req, res) => {
     throw new AppError('Only completed activation requests can be deactivated', 400);
   }
 
+  const revokedAt = new Date();
+  const activationCode = request.assignedCode
+    ? await ActivationCode.findOne({
+      requestId: request._id,
+      code: normalizeCode(request.assignedCode)
+    })
+    : null;
+
+  const license = request.assignedCode
+    ? await License.findOne({ code: normalizeCode(request.assignedCode) })
+    : null;
+
   await ActivationCode.updateMany(
     {
       requestId: request._id,
@@ -541,13 +555,43 @@ exports.deactivateActivationRequest = asyncHandler(async (req, res) => {
       $set: {
         used: false,
         deviceId: null,
-        activatedAt: null
+        activatedAt: null,
+        status: 'revoked',
+        revokedAt
       }
     }
   );
 
+  await DeviceBinding.updateMany(
+    {
+      licenseId: license?._id || null,
+      deviceId: request.deviceId
+    },
+    {
+      $set: {
+        status: 'revoked',
+        notes: reason
+      }
+    }
+  );
+
+  if (license) {
+    license.status = 'revoked';
+    license.revokedAt = revokedAt;
+    license.revokedReason = reason;
+    license.revokedBy = req.session?.admin?.username || 'admin';
+    license.tokenVersion += 1;
+    await license.save();
+  }
+
+  if (activationCode) {
+    activationCode.status = 'revoked';
+    activationCode.revokedAt = revokedAt;
+    await activationCode.save();
+  }
+
   request.status = 'deactivated';
-  request.rejectedAt = new Date();
+  request.rejectedAt = revokedAt;
   request.rejectionReason = reason;
   await request.save();
 

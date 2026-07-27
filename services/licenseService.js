@@ -477,8 +477,8 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
     .sort({ updatedAt: -1, createdAt: -1 });
   let license = binding ? await License.findById(binding.licenseId) : null;
 
-  let request = null;          // ✅ إضافة هون
-  let activationCode = null;   // ✅ إضافة هون
+  let request = null;
+  let activationCode = null;
 
   if (!license) {
     activationCode = await ActivationCode.findOne({   // بدون const
@@ -525,6 +525,22 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
   }
 
   const status = await syncLicenseState(license, now);
+
+  if (!request && license?.requestId) {
+    request = await ActivationRequest.findById(license.requestId);
+  }
+
+  if (!request && license?.code) {
+    request = await ActivationRequest.findOne({
+      assignedCode: license.code,
+      deviceId: normalizedDeviceId
+    }).sort({ createdAt: -1 });
+  }
+
+  if (request && ['rejected', 'deactivated'].includes(request.status)) {
+    return inactiveResult(request.status);
+  }
+
   if (status !== 'active' || binding.status !== 'active') {
     return inactiveResult(status);
   }
