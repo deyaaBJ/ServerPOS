@@ -68,6 +68,31 @@ const buildLicensePayload = (license) => ({
 
 exports.createRequest = asyncHandler(async (req, res) => {
   const normalizedDeviceId = req.body.deviceId.trim();
+  const activeRequest = await ActivationRequest.findActiveForDevice(normalizedDeviceId);
+
+  if (activeRequest) {
+    return res.status(200).json(buildSuccessResponse({
+      requestId: activeRequest._id,
+      status: activeRequest.status,
+      deviceId: activeRequest.deviceId,
+      createdAt: activeRequest.createdAt
+    }));
+  }
+
+  await ActivationRequest.updateMany(
+    {
+      deviceId: normalizedDeviceId,
+      status: { $in: ['completed', 'deactivated', 'expired', 'rejected'] },
+      isArchived: { $ne: true }
+    },
+    {
+      $set: {
+        isArchived: true,
+        archivedAt: new Date()
+      }
+    }
+  );
+
   const request = await ActivationRequest.create({
     deviceId: normalizedDeviceId,
     status: 'pending'

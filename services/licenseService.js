@@ -134,9 +134,9 @@ const syncLicenseState = async (license, now = nowDate()) => {
   return derived;
 };
 
-const assertDeviceBinding = async ({ license, deviceId, fingerprintHash, req, metadata = {} }) => {
-  const activeBindings = await DeviceBinding.find({ licenseId: license._id }).sort({ createdAt: 1 });
-  const existingByDevice = activeBindings.find((row) => row.deviceId === deviceId);
+const assertDeviceBinding = async ({ license, deviceId, fingerprintHash, req, metadata = {}, reactivate = false }) => {
+  const bindings = await DeviceBinding.find({ licenseId: license._id }).sort({ createdAt: 1 });
+  const existingByDevice = bindings.find((row) => row.deviceId === deviceId);
 
   if (existingByDevice) {
     if (existingByDevice.fingerprintHash !== fingerprintHash) {
@@ -161,9 +161,16 @@ const assertDeviceBinding = async ({ license, deviceId, fingerprintHash, req, me
       throw buildError(403, 'DEVICE_CHANGED', 'Device fingerprint changed. Manual review required');
     }
 
+    if (reactivate && existingByDevice.status !== 'active') {
+      existingByDevice.status = 'active';
+      existingByDevice.notes = null;
+      await existingByDevice.save();
+    }
+
     return existingByDevice;
   }
 
+  const activeBindings = bindings.filter((row) => row.status === 'active');
   if (activeBindings.length >= license.maxDevices) {
     license.status = 'requires_manual_review';
     await license.save();
@@ -272,7 +279,13 @@ const activateLicense = async ({ requestId, code, deviceId, fingerprint, req }) 
   const request = await ensureRequestApproved(requestId, normalizedDeviceId);
   const activationCode = await ensureActivationCodeUsable(request, normalizedCode);
   const license = await upsertLicenseFromActivationCode({ activationCode, request, deviceId: normalizedDeviceId, now });
-  const binding = await assertDeviceBinding({ license, deviceId: normalizedDeviceId, fingerprintHash, req });
+  const binding = await assertDeviceBinding({
+    license,
+    deviceId: normalizedDeviceId,
+    fingerprintHash,
+    req,
+    reactivate: true
+  });
   const token = await issueLicenseToken({ license, binding, now });
 
   binding.lastValidationAt = now;
