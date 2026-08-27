@@ -12,7 +12,6 @@ function DetailRow({ label, children }) {
 
 function RequestDetails({ item, approveForm, setApproveForm, onApprove, onReject, busy }) {
   const canManage = !['completed', 'deactivated'].includes(item.status);
-  const previousRequests = Array.isArray(item.previousRequests) ? item.previousRequests : [];
 
   return (
     <>
@@ -31,19 +30,6 @@ function RequestDetails({ item, approveForm, setApproveForm, onApprove, onReject
           {item.deviceUsage?.codes?.length ? item.deviceUsage.codes.join(', ') : '-'}
         </DetailRow>
       </div>
-
-      {previousRequests.length > 0 && (
-        <section className="history-block">
-          <h3>طلبات سابقة لنفس الجهاز</h3>
-          {previousRequests.map((previous) => (
-            <div className="history-row" key={previous.id}>
-              <span>{statusLabel(previous.status)}</span>
-              <strong>{previous.assignedCode || '-'}</strong>
-              <small>{formatDate(previous.createdAt)}</small>
-            </div>
-          ))}
-        </section>
-      )}
 
       {canManage && (
         <form className="approve-form" onSubmit={(event) => onApprove(event, item._id)}>
@@ -92,6 +78,7 @@ function RequestDetails({ item, approveForm, setApproveForm, onApprove, onReject
 function CodeDetails({ item, onDeactivate, busy }) {
   const activationRequest = item.requestId || {};
   const canDeactivate = activationRequest.status === 'completed' && activationRequest._id;
+
   return (
     <>
       <div className="details-grid">
@@ -121,9 +108,12 @@ export default function DetailsModal(props) {
   if (!modal) return null;
 
   return (
-    <div className="modal" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
+    <div
+      className="modal"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <div className="modal-content">
         <div className="modal-header">
           <h2>{modal.type === 'request' ? 'تفاصيل طلب التفعيل' : 'تفاصيل الكود'}</h2>

@@ -129,6 +129,27 @@ exports.getRequestStatus = asyncHandler(async (req, res) => {
     });
   }
 
+  if (['rejected', 'deactivated', 'expired'].includes(request.status)) {
+    const latestActiveRequest = await ActivationRequest.findOne({
+      deviceId: request.deviceId,
+      status: { $in: ['pending', 'approved', 'completed'] }
+    })
+      .sort({ createdAt: -1, updatedAt: -1 })
+      .lean();
+
+    if (latestActiveRequest && String(latestActiveRequest._id) !== String(request._id)) {
+      return res.json(buildSuccessResponse({
+        requestId: latestActiveRequest._id,
+        status: latestActiveRequest.status,
+        assignedCode: latestActiveRequest.assignedCode,
+        approvedAt: latestActiveRequest.approvedAt,
+        completedAt: latestActiveRequest.completedAt,
+        rejectedAt: latestActiveRequest.rejectedAt,
+        rejectionReason: latestActiveRequest.rejectionReason
+      }));
+    }
+  }
+
   res.json(buildSuccessResponse({
     requestId: request._id,
     status: request.status,

@@ -9,10 +9,28 @@ exports.getAllCodes = asyncHandler(async (req, res) => {
     .select('-__v')
     .populate('requestId', 'clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt');
 
+  const latestUsedByDevice = new Map();
+  const filteredCodes = [];
+
+  for (const code of codes) {
+    if (!code.used || !code.deviceId?.trim()) {
+      filteredCodes.push(code);
+      continue;
+    }
+
+    const deviceId = code.deviceId.trim();
+    if (latestUsedByDevice.has(deviceId)) {
+      continue;
+    }
+
+    latestUsedByDevice.set(deviceId, code);
+    filteredCodes.push(code);
+  }
+
   res.json({
     success: true,
-    count: codes.length,
-    codes
+    count: filteredCodes.length,
+    codes: filteredCodes
   });
 });
 

@@ -117,6 +117,17 @@ const upsertLicenseFromActivationCode = async ({ activationCode, request, device
 
 const getLicenseByCode = async (code) => License.findOne({ code: normalizeCode(code) });
 
+const getLatestActiveRequestForDevice = async (deviceId) => {
+  if (!deviceId?.trim()) {
+    return null;
+  }
+
+  return ActivationRequest.findOne({
+    deviceId: deviceId.trim(),
+    status: { $in: ['pending', 'approved', 'completed'] }
+  }).sort({ createdAt: -1, updatedAt: -1 });
+};
+
 const isActivationCodeInactive = (activationCode, now = nowDate()) => (
   !activationCode ||
   !activationCode.used ||
@@ -550,6 +561,13 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
     }).sort({ createdAt: -1 });
   }
 
+  if (request && ['rejected', 'deactivated', 'expired'].includes(request.status)) {
+    const latestActiveRequest = await getLatestActiveRequestForDevice(normalizedDeviceId);
+    if (latestActiveRequest && String(latestActiveRequest._id) !== String(request._id)) {
+      request = latestActiveRequest;
+    }
+  }
+
   if (request && ['rejected', 'deactivated'].includes(request.status)) {
     return inactiveResult(request.status);
   }
@@ -624,4 +642,3 @@ module.exports = {
   revokeLicense,
   buildError
 };
-
