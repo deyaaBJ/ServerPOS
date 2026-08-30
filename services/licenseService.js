@@ -500,72 +500,51 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
     status
   });
 
-  let request = await ActivationRequest.findOne({
+  let binding = await DeviceBinding.findOne({
     deviceId: normalizedDeviceId,
-    isArchived: { $ne: true },
-    status: { $in: ['pending', 'approved', 'completed'] }
-  }).sort({ completedAt: -1, approvedAt: -1, createdAt: -1, updatedAt: -1 });
+    status: 'active'
+  }).sort({ updatedAt: -1, createdAt: -1 });
 
-  if (!request) {
-    request = await ActivationRequest.findOne({
+  if (!binding) {
+    binding = await DeviceBinding.findOne({
       deviceId: normalizedDeviceId
-    }).sort({ createdAt: -1, updatedAt: -1 });
+    }).sort({ updatedAt: -1, createdAt: -1 });
   }
 
-  let activationCode = null;
-  let license = null;
-  let binding = null;
+  let license = binding ? await License.findById(binding.licenseId) : null;
 
-  if (request && ['rejected', 'deactivated'].includes(request.status)) {
-    return inactiveResult(request.status);
-  }
+  if (!binding) {
+    const activationCode = await ActivationCode.findOne({
+      deviceId: normalizedDeviceId,
+      used: true
+    }).sort({ activatedAt: -1, createdAt: -1 });
 
-  if (request) {
-    if (request.assignedCode) {
-      activationCode = await ActivationCode.findOne({
-        code: normalizeCode(request.assignedCode),
-        $or: [
-          { requestId: request._id },
-          { requestId: null }
-        ]
-      }).sort({ activatedAt: -1, createdAt: -1 });
+    if (isActivationCodeInactive(activationCode, now)) {
+      return inactiveResult(activationCode?.status === 'expired' ? 'expired' : 'not_activated');
     }
-
-    if (!activationCode) {
-      activationCode = await ActivationCode.findOne({
-        deviceId: normalizedDeviceId,
-        used: true
-      }).sort({ activatedAt: -1, createdAt: -1 });
-    }
-  } else {
-    binding = await DeviceBinding.findOne({ deviceId: normalizedDeviceId })
-      .sort({ updatedAt: -1, createdAt: -1 });
-    license = binding ? await License.findById(binding.licenseId) : null;
-
-    if (!license) {
-      activationCode = await ActivationCode.findOne({
-        deviceId: normalizedDeviceId,
-        used: true
-      }).sort({ activatedAt: -1, createdAt: -1 });
-    }
-  }
-
-  if (isActivationCodeInactive(activationCode, now)) {
-    return inactiveResult(activationCode?.status === 'expired' ? 'expired' : 'not_activated');
-  }
-
-  if (!license) {
-    request = activationCode.requestId
-      ? await ActivationRequest.findById(activationCode.requestId)
-      : request;
 
     license = await getLicenseByCode(activationCode.code);
     if (!license) {
       license = await upsertLicenseFromActivationCode({
         activationCode,
-        request,
+        request: activationCode.requestId ? await ActivationRequest.findById(activationCode.requestId) : null,
         deviceId: normalizedDeviceId,
         now: activationCode.activatedAt || now
+      });
+    }
+
+    binding = await DeviceBinding.findOne({
+      licenseId: license._id,
+      deviceId: normalizedDeviceId
+    });
+
+    if (!binding) {
+      binding = await assertDeviceBinding({
+        license,
+        deviceId: normalizedDeviceId,
+        fingerprintHash: hashValue(normalizedDeviceId),
+        req,
+        metadata: { source: 'device-status' }
       });
     }
   }
@@ -586,28 +565,6 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
   }
 
   const status = await syncLicenseState(license, now);
-
-  if (!request && license?.requestId) {
-    request = await ActivationRequest.findById(license.requestId);
-  }
-
-  if (!request && license?.code) {
-    request = await ActivationRequest.findOne({
-      assignedCode: license.code,
-      deviceId: normalizedDeviceId
-    }).sort({ createdAt: -1 });
-  }
-
-  if (request && ['rejected', 'deactivated', 'expired'].includes(request.status)) {
-    const latestActiveRequest = await getLatestActiveRequestForDevice(normalizedDeviceId);
-    if (latestActiveRequest && String(latestActiveRequest._id) !== String(request._id)) {
-      request = latestActiveRequest;
-    }
-  }
-
-  if (request && ['rejected', 'deactivated'].includes(request.status)) {
-    return inactiveResult(request.status);
-  }
 
   if (status !== 'active' || binding.status !== 'active') {
     return inactiveResult(status);
