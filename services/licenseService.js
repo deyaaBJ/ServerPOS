@@ -497,30 +497,56 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
     status
   });
 
-  let binding = await DeviceBinding.findOne({ deviceId: normalizedDeviceId })
-    .sort({ updatedAt: -1, createdAt: -1 });
-  let license = binding ? await License.findById(binding.licenseId) : null;
+  let request = await ActivationRequest.findOne({
+    deviceId: normalizedDeviceId
+  }).sort({ createdAt: -1, updatedAt: -1 });
 
-  let request = null;
   let activationCode = null;
+  let license = null;
+  let binding = null;
+
+  if (request && ['rejected', 'deactivated'].includes(request.status)) {
+    return inactiveResult(request.status);
+  }
+
+  if (request) {
+    if (request.assignedCode) {
+      activationCode = await ActivationCode.findOne({
+        code: normalizeCode(request.assignedCode),
+        $or: [
+          { requestId: request._id },
+          { requestId: null }
+        ]
+      }).sort({ activatedAt: -1, createdAt: -1 });
+    }
+
+    if (!activationCode) {
+      activationCode = await ActivationCode.findOne({
+        deviceId: normalizedDeviceId,
+        used: true
+      }).sort({ activatedAt: -1, createdAt: -1 });
+    }
+  } else {
+    binding = await DeviceBinding.findOne({ deviceId: normalizedDeviceId })
+      .sort({ updatedAt: -1, createdAt: -1 });
+    license = binding ? await License.findById(binding.licenseId) : null;
+
+    if (!license) {
+      activationCode = await ActivationCode.findOne({
+        deviceId: normalizedDeviceId,
+        used: true
+      }).sort({ activatedAt: -1, createdAt: -1 });
+    }
+  }
+
+  if (isActivationCodeInactive(activationCode, now)) {
+    return inactiveResult(activationCode?.status === 'expired' ? 'expired' : 'not_activated');
+  }
 
   if (!license) {
-    activationCode = await ActivationCode.findOne({   // بدون const
-      deviceId: normalizedDeviceId,
-      used: true
-    }).sort({ activatedAt: -1, createdAt: -1 });
-
-    if (isActivationCodeInactive(activationCode, now)) {
-      return inactiveResult(activationCode?.status === 'expired' ? 'expired' : 'not_activated');
-    }
-
-    request = activationCode.requestId              // بدون const
+    request = activationCode.requestId
       ? await ActivationRequest.findById(activationCode.requestId)
-      : null;
-
-    if (request && ['rejected', 'deactivated'].includes(request.status)) {
-      return inactiveResult(request.status);
-    }
+      : request;
 
     license = await getLicenseByCode(activationCode.code);
     if (!license) {
@@ -531,21 +557,21 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
         now: activationCode.activatedAt || now
       });
     }
+  }
 
-    binding = await DeviceBinding.findOne({
-      licenseId: license._id,
-      deviceId: normalizedDeviceId
+  binding = await DeviceBinding.findOne({
+    licenseId: license._id,
+    deviceId: normalizedDeviceId
+  });
+
+  if (!binding) {
+    binding = await assertDeviceBinding({
+      license,
+      deviceId: normalizedDeviceId,
+      fingerprintHash: hashValue(normalizedDeviceId),
+      req,
+      metadata: { source: 'device-status' }
     });
-
-    if (!binding) {
-      binding = await assertDeviceBinding({
-        license,
-        deviceId: normalizedDeviceId,
-        fingerprintHash: hashValue(normalizedDeviceId),
-        req,
-        metadata: { source: 'device-status' }
-      });
-    }
   }
 
   const status = await syncLicenseState(license, now);
