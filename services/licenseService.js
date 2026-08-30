@@ -83,6 +83,9 @@ const upsertLicenseFromActivationCode = async ({ activationCode, request, device
     clockSkewToleranceSeconds: policy.clockSkewToleranceSeconds,
     maxDevices: 1,
     status: 'active',
+    revokedAt: null,
+    revokedReason: null,
+    revokedBy: null,
     firstActivatedAt: now,
     lastValidatedAt: now
   };

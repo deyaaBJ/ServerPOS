@@ -689,6 +689,9 @@ exports.adminActivateDevice = asyncHandler(async (req, res) => {
     tokenVersion: 1,
     firstActivatedAt: now,
     lastValidatedAt: now,
+    revokedAt: null,
+    revokedReason: null,
+    revokedBy: null,
     features: []
   };
 
