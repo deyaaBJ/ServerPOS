@@ -498,8 +498,16 @@ const getDeviceActivationStatus = async ({ deviceId, req }) => {
   });
 
   let request = await ActivationRequest.findOne({
-    deviceId: normalizedDeviceId
-  }).sort({ createdAt: -1, updatedAt: -1 });
+    deviceId: normalizedDeviceId,
+    isArchived: { $ne: true },
+    status: { $in: ['pending', 'approved', 'completed'] }
+  }).sort({ completedAt: -1, approvedAt: -1, createdAt: -1, updatedAt: -1 });
+
+  if (!request) {
+    request = await ActivationRequest.findOne({
+      deviceId: normalizedDeviceId
+    }).sort({ createdAt: -1, updatedAt: -1 });
+  }
 
   let activationCode = null;
   let license = null;
