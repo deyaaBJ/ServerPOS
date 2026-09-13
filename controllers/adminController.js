@@ -71,55 +71,7 @@ const refreshExpiredRequestState = async (request) => {
   return request;
 };
 
-const getPreviousRequestsDetails = async (deviceId, currentRequestId = null) => {
-  const filter = {
-    deviceId: deviceId.trim()
-  };
 
-  if (currentRequestId) {
-    filter._id = { $ne: currentRequestId };
-  }
-
-  const previousRequests = await ActivationRequest.find(filter)
-    .sort({ createdAt: -1 })
-    .lean();
-
-  if (!previousRequests.length) {
-    return [];
-  }
-
-  const requestIds = previousRequests.map((request) => request._id);
-  const codes = await ActivationCode.find({
-    requestId: { $in: requestIds }
-  })
-    .sort({ createdAt: -1 })
-    .select('requestId code used activatedAt createdAt')
-    .lean();
-
-  const codesByRequestId = new Map();
-  for (const codeEntry of codes) {
-    const key = String(codeEntry.requestId);
-    if (!codesByRequestId.has(key)) {
-      codesByRequestId.set(key, []);
-    }
-    codesByRequestId.get(key).push({
-      code: codeEntry.code,
-      used: codeEntry.used,
-      activatedAt: codeEntry.activatedAt,
-      createdAt: codeEntry.createdAt
-    });
-  }
-
-  return previousRequests.map((request) => ({
-    id: request._id,
-    status: request.status,
-    assignedCode: request.assignedCode,
-    createdAt: request.createdAt,
-    approvedAt: request.approvedAt,
-    completedAt: request.completedAt,
-    codes: codesByRequestId.get(String(request._id)) || []
-  }));
-};
 
 const archiveEndedRequestsForDevice = async (deviceId, currentRequestId = null) => {
   // Archive ALL previous requests for this device (except the current one)
@@ -197,18 +149,7 @@ const attachDeviceUsageToRequests = async (requests) => {
   });
 };
 
-const attachPreviousRequestsToRequests = async (requests) => Promise.all(
-  requests.map(async (request) => {
-    const latestClientDetails = await getLatestClientDetailsForDevice(request.deviceId, request._id);
 
-    return {
-      ...request,
-      clientName: request.clientName || latestClientDetails.clientName,
-      clientPhone: request.clientPhone || latestClientDetails.clientPhone,
-      previousRequests: await getPreviousRequestsDetails(request.deviceId, request._id)
-    };
-  })
-);
 
 const getActivationLogFilters = async (clientName) => {
   const trimmedName = clientName?.trim();
@@ -366,11 +307,10 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
   );
 
   const requestsWithDeviceUsage = await attachDeviceUsageToRequests(refreshedRequests);
-  const requestsWithPreviousRequests = await attachPreviousRequestsToRequests(requestsWithDeviceUsage);
 
   res.json({
     success: true,
-    requests: requestsWithPreviousRequests
+    requests: requestsWithDeviceUsage
   });
 });
 
@@ -473,7 +413,6 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
 
   await archiveEndedRequestsForDevice(request.deviceId, request._id);
 
-  const previousRequests = await getPreviousRequestsDetails(request.deviceId, request._id);
   const latestClientDetails = await getLatestClientDetailsForDevice(request.deviceId, request._id);
 
   res.json({
@@ -482,8 +421,7 @@ exports.approveActivationRequest = asyncHandler(async (req, res) => {
     request: {
       ...request.toObject(),
       clientName: request.clientName || latestClientDetails.clientName,
-      clientPhone: request.clientPhone || latestClientDetails.clientPhone,
-      previousRequests
+      clientPhone: request.clientPhone || latestClientDetails.clientPhone
     }
   });
 });
