@@ -79,10 +79,12 @@ exports.createRequest = asyncHandler(async (req, res) => {
     }));
   }
 
+  // Archive ALL previous requests for this device (except active ones)
+  // This ensures only the latest request is shown and counted
   await ActivationRequest.updateMany(
     {
       deviceId: normalizedDeviceId,
-      status: { $in: ['completed', 'deactivated', 'expired', 'rejected'] },
+      status: { $nin: ['pending', 'approved'] },  // Archive non-active requests
       isArchived: { $ne: true }
     },
     {

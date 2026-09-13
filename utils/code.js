@@ -2,6 +2,9 @@ const normalizeCode = (value) => String(value || '').trim().toUpperCase();
 
 const DAY_CODE_PATTERN = /^DAY-(\d+)$/i;
 
+// Milliseconds per day constant for accurate date calculations
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 const isValidCode = (value) => normalizeCode(value).length >= 3;
 
 const getDayCodeDuration = (value) => {
@@ -22,9 +25,11 @@ const getCodeExpiryDate = (value, activatedAt) => {
     return null;
   }
 
-  const expiryDate = new Date(activatedAt);
-  expiryDate.setDate(expiryDate.getDate() + days);
-  return expiryDate;
+  // FIXED: Use milliseconds instead of setDate/getDate which are timezone-dependent
+  // This ensures accurate date calculation regardless of server timezone
+  // For DAY-3 with activatedAt: 2026-09-13T19:07:53.673Z
+  // Result will be: 2026-09-16T19:07:53.673Z (exactly +72 hours)
+  return new Date(activatedAt.getTime() + (days * MS_PER_DAY));
 };
 
 const isCodeExpired = (value, activatedAt, now = new Date()) => {

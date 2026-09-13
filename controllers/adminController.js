@@ -122,9 +122,10 @@ const getPreviousRequestsDetails = async (deviceId, currentRequestId = null) => 
 };
 
 const archiveEndedRequestsForDevice = async (deviceId, currentRequestId = null) => {
+  // Archive ALL previous requests for this device (except the current one)
+  // This ensures only the latest request is shown in the admin panel
   const filter = {
     deviceId: deviceId.trim(),
-    status: { $in: ['completed', 'deactivated', 'expired', 'rejected'] },
     isArchived: { $ne: true }
   };
 
