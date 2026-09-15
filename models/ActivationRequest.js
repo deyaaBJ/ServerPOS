@@ -68,6 +68,7 @@ const activationRequestSchema = new mongoose.Schema({
 });
 
 activationRequestSchema.index({ deviceId: 1, status: 1 });
+activationRequestSchema.index({ deviceId: 1, approvedAt: -1, createdAt: -1 });
 activationRequestSchema.index({ clientName: 1, status: 1 });
 
 activationRequestSchema.pre('save', function() {

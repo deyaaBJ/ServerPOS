@@ -35,6 +35,27 @@ const getLatestClientDetailsForDevice = async (deviceId, currentRequestId = null
   };
 };
 
+// A request can be archived once it has ended, but its client details are still
+// useful when that same device asks for activation again.  Keep these values as
+// suggestions only; the admin can change them in the approval form.
+const attachKnownClientDetails = async (requests) => Promise.all(
+  requests.map(async (request) => {
+    const requestData = typeof request.toObject === 'function'
+      ? request.toObject()
+      : request;
+    const knownClient = await getLatestClientDetailsForDevice(
+      requestData.deviceId,
+      requestData._id
+    );
+
+    return {
+      ...requestData,
+      knownClientName: knownClient.clientName,
+      knownClientPhone: knownClient.clientPhone
+    };
+  })
+);
+
 const refreshExpiredRequestState = async (request) => {
   if (!request?.assignedCode || !request?.completedAt) {
     return request;
@@ -307,10 +328,11 @@ exports.getActivationRequests = asyncHandler(async (req, res) => {
   );
 
   const requestsWithDeviceUsage = await attachDeviceUsageToRequests(refreshedRequests);
+  const requestsWithKnownClients = await attachKnownClientDetails(requestsWithDeviceUsage);
 
   res.json({
     success: true,
-    requests: requestsWithDeviceUsage
+    requests: requestsWithKnownClients
   });
 });
 

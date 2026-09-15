@@ -23,7 +23,7 @@ export default function RequestsPage() {
           <tbody>
             {requests.map((item) => (
               <tr key={item._id}>
-                <td>{item.clientName || latestRequestByDevice?.[item.deviceId]?.clientName || '-'}</td>
+                <td>{item.clientName || item.knownClientName || latestRequestByDevice?.[item.deviceId]?.clientName || '-'}</td>
                 <td><span className={`badge ${statusClass(item.status)}`}>{statusLabel(item.status)}</span></td>
                 <td><span className="date-text">{formatDate(item.createdAt)}</span></td>
                 <td>

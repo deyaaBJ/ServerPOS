@@ -64,8 +64,8 @@ export default function DashboardLayout({ onLogout }) {
     setModal({ type, item });
     setApproveForm({
       code: item.assignedCode || item.code || '',
-      clientName: item.clientName || item.requestId?.clientName || latestRequest?.clientName || '',
-      clientPhone: item.clientPhone || item.requestId?.clientPhone || latestRequest?.clientPhone || ''
+      clientName: item.clientName || item.requestId?.clientName || item.knownClientName || latestRequest?.clientName || '',
+      clientPhone: item.clientPhone || item.requestId?.clientPhone || item.knownClientPhone || latestRequest?.clientPhone || ''
     });
   };
 
