@@ -125,11 +125,21 @@ const attachDeviceUsageToRequests = async (requests) => {
       .filter(Boolean)
   )];
 
+  const currentRequestIds = requests
+    .filter((request) => request.status === 'completed')
+    .map((request) => request._id);
+  if (!currentRequestIds.length) {
+    return requests.map((request) => ({
+      ...request.toObject(),
+      deviceUsage: { exists: false, activationCount: 0, lastActivatedAt: null }
+    }));
+  }
   const deviceUsageRows = await ActivationCode.aggregate([
     {
       $match: {
         used: true,
-        deviceId: { $in: deviceIds }
+        deviceId: { $in: deviceIds },
+        requestId: { $in: currentRequestIds }
       }
     },
     { $sort: { activatedAt: -1, createdAt: -1 } },
@@ -137,7 +147,6 @@ const attachDeviceUsageToRequests = async (requests) => {
       $group: {
         _id: '$deviceId',
         activationCount: { $sum: 1 },
-        codes: { $push: '$code' },
         lastActivatedAt: { $first: '$activatedAt' }
       }
     }
@@ -149,7 +158,6 @@ const attachDeviceUsageToRequests = async (requests) => {
       {
         exists: row.activationCount > 0,
         activationCount: row.activationCount,
-        codes: row.codes,
         lastActivatedAt: row.lastActivatedAt || null
       }
     ])
@@ -159,7 +167,6 @@ const attachDeviceUsageToRequests = async (requests) => {
     const usage = usageByDeviceId.get(request.deviceId) || {
       exists: false,
       activationCount: 0,
-      codes: [],
       lastActivatedAt: null
     };
 
@@ -180,8 +187,7 @@ const getActivationLogFilters = async (clientName) => {
   }
 
   const matchingRequests = await ActivationRequest.find({
-    clientName: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: 'i' },
-    isArchived: { $ne: true }
+    clientName: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: 'i' }
   })
     .select('_id clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
     .lean();
@@ -283,39 +289,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
 
 // Get stats
 exports.getStats = asyncHandler(async (req, res) => {
-  const [
-    totalCodes,
-    usedCodes,
-    availableCodes,
-    uniqueDevices,
-    pendingRequests,
-    recentActivations,
-    adminInfo
-  ] = await Promise.all([
-    ActivationCode.countDocuments(),
-    ActivationCode.countDocuments({ used: true }),
-    ActivationCode.countDocuments({ used: false }),
-    ActivationCode.distinct('deviceId', { used: true, deviceId: { $ne: null } }),
-    ActivationRequest.countDocuments({ status: 'pending' }),
-    ActivationCode.find({ used: true })
-      .sort({ activatedAt: -1 })
-      .limit(10)
-      .select('code deviceId activatedAt'),
-    Admin.findOne({ username: 'admin' }).select('lastChanged')
-  ]);
-
-  res.json({
-    success: true,
-    stats: {
-      totalCodes,
-      usedCodes,
-      availableCodes,
-      uniqueDevices: uniqueDevices.length,
-      pendingRequests,
-      lastPasswordChange: adminInfo?.lastChanged
-    },
-    recentActivations
-  });
+  res.json({ success: true });
 });
 
 exports.getActivationRequests = asyncHandler(async (req, res) => {
@@ -363,7 +337,6 @@ exports.getActivationLogs = asyncHandler(async (req, res) => {
   })
     .populate('requestId', 'clientName clientPhone deviceId assignedCode approvedAt completedAt status createdAt updatedAt')
     .sort({ createdAt: -1 })
-    .limit(200)
     .lean();
 
   res.json({
@@ -546,10 +519,32 @@ exports.deactivateActivationRequest = asyncHandler(async (req, res) => {
   }
 
   if (activationCode) {
+    activationCode.used = false;
+    activationCode.deviceId = null;
+    activationCode.activatedAt = null;
+    activationCode.expiresAt = null;
+    activationCode.lastValidatedAt = null;
     activationCode.status = 'revoked';
     activationCode.revokedAt = revokedAt;
     await activationCode.save();
   }
+
+  // End any older active request for this device so a previously issued
+  // temporary license cannot become the device's current activation again.
+  await ActivationRequest.updateMany(
+    {
+      _id: { $ne: request._id },
+      deviceId: request.deviceId,
+      status: { $in: ['approved', 'completed'] }
+    },
+    {
+      $set: {
+        status: 'deactivated',
+        rejectedAt: revokedAt,
+        rejectionReason: 'Superseded by a later activation and deactivated'
+      }
+    }
+  );
 
   request.status = 'deactivated';
   request.rejectedAt = revokedAt;

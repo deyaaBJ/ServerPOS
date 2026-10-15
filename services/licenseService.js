@@ -326,7 +326,8 @@ const activateLicense = async ({ requestId, code, deviceId, fingerprint, req }) 
     requestId: request._id,
     metadata: {
       licenseId: String(license._id),
-      type: license.type
+      type: license.type,
+      licenseType: license.type
     }
   });
 

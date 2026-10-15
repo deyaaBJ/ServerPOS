@@ -27,7 +27,9 @@ function RequestDetails({ item, approveForm, setApproveForm, onApprove, onReject
         <DetailRow label="آخر تحديث">{formatDate(item.updatedAt)}</DetailRow>
         <DetailRow label="عدد تفعيلات نفس الجهاز">{Number(item.deviceUsage?.activationCount || 0).toLocaleString('ar')}</DetailRow>
         <DetailRow label="أكواد نفس الجهاز">
-          {item.deviceUsage?.codes?.length ? item.deviceUsage.codes.join(', ') : '-'}
+          {item.deviceUsage?.activationCount
+            ? `يوجد ${Number(item.deviceUsage.activationCount).toLocaleString('ar')} كود مرتبط بهذا الجهاز`
+            : '-'}
         </DetailRow>
       </div>
 

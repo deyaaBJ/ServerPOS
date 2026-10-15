@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useOutletContext } from 'react-router-dom';
 import { request } from '../api';
 import Alert from '../components/Alert';
-import Stats from '../components/Stats';
 import DetailsModal from '../components/DetailsModal';
 
 const emptyApproveForm = {
@@ -13,8 +12,6 @@ const emptyApproveForm = {
 
 export default function DashboardLayout({ onLogout }) {
   const [requests, setRequests] = useState([]);
-  const [codes, setCodes] = useState([]);
-  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [alert, setAlert] = useState(null);
@@ -40,14 +37,8 @@ export default function DashboardLayout({ onLogout }) {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [statsData, requestsData, codesData] = await Promise.all([
-        request('/admin/stats'),
-        request('/admin/activation-requests'),
-        request('/codes/')
-      ]);
-      setStats(statsData.stats || {});
+      const requestsData = await request('/admin/activation-requests');
       setRequests(requestsData.requests || []);
-      setCodes(codesData.codes || []);
     } catch (error) {
       setAlert({ type: 'danger', message: error.message });
     } finally {
@@ -152,7 +143,6 @@ export default function DashboardLayout({ onLogout }) {
 
         <div className="panel-body">
           <Alert alert={alert} onClose={() => setAlert(null)} />
-          <Stats stats={stats} />
 
           {/* روابط حقيقية بدل أزرار تبديل تبويب - كل صفحة إلها مسار مستقل */}
           <nav className="tabs" aria-label="الصفحات">
@@ -169,7 +159,7 @@ export default function DashboardLayout({ onLogout }) {
 
           {loading
             ? <div className="loading">جاري تحميل البيانات...</div>
-            : <Outlet context={{ requests, codes, openDetails, latestRequestByDevice }} />}
+            : <Outlet context={{ requests, openDetails, latestRequestByDevice }} />}
         </div>
       </section>
 

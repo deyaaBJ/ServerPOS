@@ -6,6 +6,8 @@ import { request } from '../api';
 const activationTypeLabel = (log) => {
   if (log?.metadata?.directActivation) return 'تفعيل مباشر';
   if (log?.metadata?.source === 'device-status') return 'تفعيل عبر الكود';
+  if (log?.metadata?.licenseType === 'temporary' || log?.metadata?.type === 'temporary') return 'تفعيل مؤقت';
+  if (log?.metadata?.licenseType === 'permanent' || log?.metadata?.type === 'permanent') return 'تفعيل دائم';
   return 'تفعيل من طلب';
 };
 

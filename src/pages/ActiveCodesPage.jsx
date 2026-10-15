@@ -3,13 +3,18 @@ import { formatDate, statusClass, statusLabel } from '../api';
 import { useDashboardData } from '../layouts/DashboardLayout';
 
 export default function ActiveCodesPage() {
-  const { codes, openDetails, latestRequestByDevice } = useDashboardData();
+  const { requests, openDetails, latestRequestByDevice } = useDashboardData();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const activeCodes = useMemo(() => codes.filter((code) => {
-    const linkedRequest = code.requestId;
-    return linkedRequest?.clientName && ['approved', 'completed'].includes(linkedRequest.status);
-  }), [codes]);
+  const activeCodes = useMemo(() => requests
+    .filter((request) => request.status === 'completed' && request.assignedCode)
+    .map((request) => ({
+      _id: request._id,
+      code: request.assignedCode,
+      deviceId: request.deviceId,
+      activatedAt: request.completedAt,
+      requestId: request
+    })), [requests]);
 
   const filteredActiveCodes = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
